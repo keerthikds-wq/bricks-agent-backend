@@ -1,0 +1,59 @@
+const jwt = require('jsonwebtoken');
+
+/**
+ * Core token extractor — sets req.user and calls next().
+ * Responds 401/403 if the token is missing or invalid.
+ */
+const auth = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) {
+        return res.status(401).json({ status: 401, message: 'You are not authenticated.', error: true });
+    }
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+    jwt.verify(token, process.env.SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ status: 403, message: 'Token is not valid.', error: true });
+        }
+        req.user = user;
+        next();
+    });
+};
+
+/** Requires a valid JWT (any role) */
+const Auth = auth;
+
+/** Requires the caller to be a Seller */
+const sellerAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && req.user.isSeller) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: Sellers only.', error: true });
+    });
+};
+
+/** Requires the caller to be a User (buyer) */
+const userAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && req.user.isUser) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: Users only.', error: true });
+    });
+};
+
+/** Requires the caller to be an Admin */
+const adminAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && req.user.isAdmin) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: Admins only.', error: true });
+    });
+};
+
+/** Allows any authenticated role */
+const verifyTokenwithAuthorization = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && (req.user.isAdmin || req.user.isSeller || req.user.isUser)) {
+            return next();
+        }
+        return res.status(403).json({ status: 403, message: 'You are not authorized.', error: true });
+    });
+};
+
+module.exports = { Auth, auth, adminAuth, sellerAuth, userAuth, verifyTokenwithAuthorization };

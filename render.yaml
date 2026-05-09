@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: bricks-agent-backend
+    env: node
+    region: singapore   # closest to India — change to oregon if you prefer US
+    plan: free           # Render free tier (sleeps after 15 min inactivity)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set the rest of these in the Render Dashboard → Environment tab:
+      # URL, SECRET, SESSION_SECRET, SENDGRID_API_KEY, EMAIL,
+      # CLOUDANARY_CLOUD_NAME, CLOUDANARY_API_KEY, CLOUDANARY_API_SECRET,
+      # TEXTLOCAL_API_KEY, TEXTLOCAL_SENDER
