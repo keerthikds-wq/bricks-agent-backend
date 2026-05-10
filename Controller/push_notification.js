@@ -1,5 +1,4 @@
 var admin=require("firebase-admin");
-var fcm=require("fcm-notification");
 const {StatusCodes}=require("http-status-codes");
 const Notification=require("../Model/Notification")
 const Allusernotification=require("../Model/allusernotification");
@@ -9,11 +8,11 @@ const User=require("../Model/User")
 const Seller=require("../Model/Seller")
 const crypto = require("crypto");
 const {v4: uuid} = require('uuid');
-const fcm_check = require('fcm-node');
 
 var serviceAccount=require("../Utils/config.json")
-const certPath=admin.credential.cert(serviceAccount);
-var FCM=new fcm(certPath)
+if (!admin.apps.length) {
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+}
 const id = uuid()
 // const id = crypto.randomBytes(16).toString();
 
