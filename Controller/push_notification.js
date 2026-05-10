@@ -1,5 +1,4 @@
 var admin=require("firebase-admin");
-var fcm=require("fcm-notification");
 const {StatusCodes}=require("http-status-codes");
 const Notification=require("../Model/Notification")
 const Allusernotification=require("../Model/allusernotification");
@@ -7,15 +6,13 @@ const Sellernotification=require("../Model/Sellernotification");
 const GroupNotification = require("../Model/Groupnotification");
 const User=require("../Model/User")
 const Seller=require("../Model/Seller")
-const crypto = require("crypto");
 const {v4: uuid} = require('uuid');
-const fcm_check = require('fcm-node');
 
 var serviceAccount=require("../Utils/config.json")
-const certPath=admin.credential.cert(serviceAccount);
-var FCM=new fcm(certPath)
-const id = uuid()
-// const id = crypto.randomBytes(16).toString();
+if (!admin.apps.length) {
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+}
+const id = uuid();
 
 exports.sendPushNotification =async (req,res,next)=>{
     const {title,body,message,fcm_token,userid,notificationid}=req.body;
@@ -48,20 +45,13 @@ exports.sendPushNotification =async (req,res,next)=>{
     //await Notification.findOneAndUpdate(fcm_token,{userid:verify._id},{new:true})
 
     if(insertNotification){
-        
-
-        FCM.send(message, function(err,resp){
-            if(err){
-                return res.status(500).send({
-                    message:err
-                })
-            }else{
-                return res.status(200).send({
-                    message:"Notification sent successfully",
-                    data:message
-                })
-            }
-        })
+        admin.messaging().send(message)
+            .then(resp => {
+                return res.status(200).send({ message:"Notification sent successfully", data:message })
+            })
+            .catch(err => {
+                return res.status(500).send({ message:err })
+            })
     }else{
         return res.status(StatusCodes.BAD_REQUEST).send({
             message:"Oop!!! Something went wrong",
@@ -69,7 +59,7 @@ exports.sendPushNotification =async (req,res,next)=>{
         })
     }
 
-    
+
 }
     catch(err){
         console.log(err)
@@ -169,20 +159,13 @@ exports.sellerSendPushNotification =async (req,res,next)=>{
     //await Notification.findOneAndUpdate(fcm_token,{userid:verify._id},{new:true})
 
     if(insertNotification){
-        
-
-        FCM.send(message, function(err,resp){
-            if(err){
-                return res.status(500).send({
-                    message:err
-                })
-            }else{
-                return res.status(200).send({
-                    message:"Notification sent successfully",
-                    data:message
-                })
-            }
-        })
+        admin.messaging().send(message)
+            .then(resp => {
+                return res.status(200).send({ message:"Notification sent successfully", data:message })
+            })
+            .catch(err => {
+                return res.status(500).send({ message:err })
+            })
     }else{
         return res.status(StatusCodes.BAD_REQUEST).send({
             message:"Oop!!! Something went wrong",
@@ -190,7 +173,7 @@ exports.sellerSendPushNotification =async (req,res,next)=>{
         })
     }
 
-    
+
 }
     catch(err){
         console.log(err)
@@ -377,12 +360,8 @@ exports.sendTopicNotification = async (req, res) => {
         // token: verifye.fcm_token,
       };
   
-      FCM.send(message, async function (err, resp) {
-        if (err) {
-          return res.status(500).send({
-            message: err,
-          });
-        } else {
+      admin.messaging().send(message)
+        .then(async resp => {
           await GroupNotification.create({
             title,
             body,
@@ -390,14 +369,15 @@ exports.sendTopicNotification = async (req, res) => {
             notificationid: resp,
             topic: topic,
           });
-  
           console.log({ resp });
           return res.status(200).send({
             message: "Notification sent successfully",
             data: message,
           });
-        }
-      });
+        })
+        .catch(err => {
+          return res.status(500).send({ message: err });
+        });
     } catch (err) {
       console.log(err);
       throw err;
@@ -427,3 +407,4 @@ exports.sendTopicNotification = async (req, res) => {
       });
     }
   };
+                                                                                                                                                                                                                                                                                                                                            
