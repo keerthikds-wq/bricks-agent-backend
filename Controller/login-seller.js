@@ -9,20 +9,16 @@ const cloudinary = require("../Utils/cloudinary");
 const loginSeller = async (req, res, next) => {
     const { phone } = req.body;
     try {
-        const seller = await Seller.findOne({ phone, is_delete: 0 });
         const otpnum = Math.floor(1000 + Math.random() * 9000);
         await Otp.updateMany({ phone }, { "is_delete": 1 });
-        await Otp.create({
-            Otp: otpnum,
-            phone
-        });
+        await Otp.create({ Otp: otpnum, phone });
         await sendOtp(phone, otpnum);
         return res.send({ "status": 200, "message": "OTP sent successfully", "error": false });
     } catch (error) {
         console.log(error);
         return res.status(401).send({ "status": 401, "data": null, "message": "Something went wrong!", "error": true });
     }
-}
+};
 
 const signupSeller = async (req, res, next) => {
     try {
@@ -30,7 +26,7 @@ const signupSeller = async (req, res, next) => {
             return res.status(401).send({ "status": 401, "data": null, "message": "Seller already exists", "error": false });
         }
         const result = await cloudinary.uploader.upload(req.file.path);
-        const data = await new Seller({
+        const data = new Seller({
             name: req.body.name,
             email: req.body.email,
             phone: req.body.phone,
@@ -53,11 +49,39 @@ const signupSeller = async (req, res, next) => {
         console.log(error);
         return res.status(401).send({ "status": 401, "data": null, "message": "Something went wrong!", "error": true });
     }
-}
+};
+
+const emailVerify = async (req, res, next) => {
+    const { email } = req.body;
+    try {
+        const seller = await Seller.findOne({ email, is_delete: 0 });
+        if (!seller) {
+            return res.status(401).send({ "status": 401, "data": null, "message": "Seller not found", "error": true });
+        }
+        let otpnum = Math.floor(1000 + Math.random() * 9000);
+        await Otp.updateMany({ "is_delete": 1 });
+        const otp = await Otp.create({ Otp: otpnum, seller: seller.id, email });
+        const msg = {
+            to: seller.email,
+            from: process.env.EMAIL,
+            subject: 'email verify',
+            text: 'OTP : ' + otp.Otp,
+            html: '<strong>OTP : ' + otp.Otp + '</strong>',
+        };
+        sg_mail.send(msg).then(() => {
+            return res.send({ "status": 200, "message": "Otp send successfully", "error": false });
+        }).catch((error) => {
+            console.error(error);
+            return res.status(500).send({ "status": 500, "message": "Otp send Failed", "error": true });
+        });
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
+    }
+};
 
 const otpVerifyLogin = async (req, res, next) => {
     const { phone, otp } = req.body;
-    // Master OTP bypass for testing
     const MASTER_OTP = "0000";
     try {
         const o = await Otp.findOne({ phone, "is_delete": 0 });
@@ -87,7 +111,7 @@ const otpVerifyLogin = async (req, res, next) => {
         console.log(error.message);
         return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
     }
-}
+};
 
 const otpVerify = async (req, res, next) => {
     const { phone, otp } = req.body;
@@ -107,7 +131,7 @@ const otpVerify = async (req, res, next) => {
         console.log(error.message);
         return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
     }
-}
+};
 
 const logout = (req, res, next) => {
     try {
@@ -119,4 +143,4 @@ const logout = (req, res, next) => {
     }
 };
 
-module.exports = { loginSeller, signupSeller, otpVerify, otpVerifyLogin, logout };
+module.exports = { loginSeller, signupSeller, emailVerify, otpVerify, otpVerifyLogin, logout };
