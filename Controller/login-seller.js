@@ -93,7 +93,7 @@ const emailVerify = async (req, res, next) => {
             seller: seller.id,
             email
         });
-        await sendOtp(phone, otpnum);
+        sendOtp(phone, otpnum).catch(err => console.error("SMS async error:", err));
         /* const dynamic = `Your OTP for login to Bricks Agent account is ${otpnum}. It is valid for 10 mins.\nBricks Agent Team.\n(A Product of Swami Vivekananda Technologies Pvt Ltd).`
         const url = 'https://api.textlocal.in/send/?apiKey=NzQ0MzdhNjU1NjU2MzY2MTZkNDEzOTYyNTQ0Mzc4NmU=&numbers=' + phone + '&sender=SVTPLC&message=' + encodeURIComponent(dynamic);
                         axios
