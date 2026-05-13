@@ -1,4 +1,4 @@
-const { jwt, sg_mail, md5, fs, path,app } = require('../config');
+const { jwt, sg_mail, md5, fs, path, app } = require('../config');
 const Seller = require("../Model/Seller");
 const Otp = require('../Model/Otp');
 const { randomString } = require('../Utils');
@@ -23,62 +23,39 @@ const loginSeller = async (req, res, next) => {
         console.error("loginSeller error:", error.message);
         return res.status(500).send({ "status": 500, "data": null, "message": "Something went wrong. Please try again.", "error": true });
     }
-}
+};
+
 const signupSeller = async (req, res, next) => {
-
     try {
-        if (await Seller.exists({phone:req.body.phone})) {
-            return res.status(401).send({ "status": 401, "data": null,  "message": "Seller already exists", "error": false });
+        if (await Seller.exists({ phone: req.body.phone })) {
+            return res.status(401).send({ "status": 401, "data": null, "message": "Seller already exists", "error": false });
         }
-        const result=await cloudinary.uploader.upload(req.file.path)      
-                    const data = await new Seller({
-                        name:req.body.name,
-                        email:req.body.email,
-                        phone:req.body.phone,
-                        pincode:req.body.pincode,
-                        profile:result.secure_url,
-                        gst:req.body.gst,
-                        longitude:req.body.longitude,
-                        latitude:req.body.latitude,
-                        address:req.body.address,
-                    });
-       
-  
-                //let uploadPath = process.env.PRODUCT_FOLDER;
-                //let sampleFiles = req.files.profile;
-                //const result = await cloudinary.uploader.upload(req.file.path);
-                // if (sampleFiles) {
-                //     pictureimage = randomString() + path.extname(sampleFiles.name);
-                //     //sampleFiles.mv(uploadPath + name);
-                    
-                //     profile = result.secure_url;
-                //     // await unlink(path.join(__dirname, '.' + uploadPath + name));
-                //     // console.log(`successfully deleted ${uploadPath + name}`);
-                // }
-             
-                    //req.body.profile = result.secure_url;
-               
-            
-       
+        const result = await cloudinary.uploader.upload(req.file.path);
+        const data = new Seller({
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            pincode: req.body.pincode,
+            profile: result.secure_url,
+            gst: req.body.gst,
+            longitude: req.body.longitude,
+            latitude: req.body.latitude,
+            address: req.body.address,
+        });
         const seller = await data.save();
-        console.log(seller)
-
-
-        //let token = jwt.sign({ seller }, process.env.SECRET);
         const token = jwt.sign({
-            id:seller._id,
-            email:seller.email,
-            phone:seller.phone,
-            isSeller:seller.isSeller,
+            id: seller._id,
+            email: seller.email,
+            phone: seller.phone,
+            isSeller: seller.isSeller,
         }, process.env.SECRET, { expiresIn: "3d" });
-
-
-        return res.send({ "status": 200, "data": seller,token, "message": "Seller created successfully", "error": false });
+        return res.send({ "status": 200, "data": seller, token, "message": "Seller created successfully", "error": false });
     } catch (error) {
         console.log(error);
         return res.status(401).send({ "status": 401, "data": null, "message": "Something went wrong!", "error": true });
     }
-}
+};
+
 const emailVerify = async (req, res, next) => {
     const { email } = req.body;
     try {
@@ -88,43 +65,26 @@ const emailVerify = async (req, res, next) => {
         }
         let otpnum = Math.floor(1000 + Math.random() * 9000);
         await Otp.updateMany({ "is_delete": 1 });
-        const otp = await Otp.create({
-            Otp: otpnum,
-            seller: seller.id,
-            email
-        });
-        sendOtp(phone, otpnum).catch(err => console.error("SMS async error:", err));
-        /* const dynamic = `Your OTP for login to Bricks Agent account is ${otpnum}. It is valid for 10 mins.\nBricks Agent Team.\n(A Product of Swami Vivekananda Technologies Pvt Ltd).`
-        const url = 'https://api.textlocal.in/send/?apiKey=NzQ0MzdhNjU1NjU2MzY2MTZkNDEzOTYyNTQ0Mzc4NmU=&numbers=' + phone + '&sender=SVTPLC&message=' + encodeURIComponent(dynamic);
-                        axios
-                            .get(url)
-                            .then(function (response) {
-                                console.log('entered second');
-                                console.log(response.data);
-                            })
-                            .catch(function (error) {
-                                console.log(error);
-                            }); */
+        const otp = await Otp.create({ Otp: otpnum, seller: seller.id, email });
         const msg = {
-            to: seller.email, // Change to your recipient
-            from: process.env.EMAIL, // Change to your verified sender
+            to: seller.email,
+            from: process.env.EMAIL,
             subject: 'email verify',
             text: 'OTP : ' + otp.Otp,
             html: '<strong>OTP : ' + otp.Otp + '</strong>',
-        }
+        };
         sg_mail.send(msg).then(() => {
-            console.log('Email sent');
             return res.send({ "status": 200, "message": "Otp send successfully", "error": false });
         }).catch((error) => {
-            console.error(error)
+            console.error(error);
             return res.status(500).send({ "status": 500, "message": "Otp send Failed", "error": true });
         });
     } catch (error) {
         console.log(error.message);
         return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
     }
+};
 
-}
 const otpVerifyLogin = async (req, res, next) => {
     const { phone, otp } = req.body;
     // Master OTP bypass for testing — remove before production
@@ -174,7 +134,8 @@ const otpVerifyLogin = async (req, res, next) => {
         console.error("seller otpVerifyLogin error:", error.message);
         return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
     }
-}
+};
+
 const otpVerify = async (req, res, next) => {
     const { phone, otp } = req.body;
     try {
@@ -184,4 +145,26 @@ const otpVerify = async (req, res, next) => {
         }
         const expiry = new Date(new Date(o.createdAt).getTime() + (5 * 60000));
         if (new Date() > expiry) {
-            return res.send({ "status": 401, "data": null, "mes
+            return res.send({ "status": 401, "data": null, "message": "Otp timed-out", "error": false });
+        }
+        if (String(otp) === String(o.Otp)) {
+            return res.send({ "status": 200, "data": null, "message": "Otp verified successfully", "error": false });
+        }
+        return res.status(401).send({ "status": 401, "data": null, "message": "Otp verification failed", "error": true });
+    } catch (error) {
+        console.error("seller otpVerify error:", error.message);
+        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
+    }
+};
+
+const logout = (req, res, next) => {
+    try {
+        req.session.destroy();
+        return res.send({ status: true, msg: "Seller Logged out successfully" });
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
+    }
+};
+
+module.exports = { loginSeller, signupSeller, emailVerify, otpVerify, otpVerifyLogin, logout };
