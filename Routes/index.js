@@ -21,6 +21,7 @@ router.use('/seller-premiums', require("./sellerpremium"));
 router.use('/push-notification', require("./pushnotification"));
 /* router.use('/push-seller-notification', require("./seller_push")); */
 router.use('/bid', require("./bid"));
+router.use('/requirement', require("./requirement"));
 // router.use('/notification', require("./notification"));
 // router.use('/cart', require("./cart"));
 // router.use('/wishlist', require("./wishlist"));
