@@ -14,31 +14,23 @@ const addBid = async (req, res, next) => {
 
 const getBidbyOrder = async (req, res) => {
     try {
-        let bid = await Bid.find({ order: req.params.id })
-        .populate("order");
-        if (!bid) {
-            return res.status(404).send({ "status": 404, "data": null, "message": "No bid yet" });
-            /* bid=[]; */
-        }
-        return res.send({ 
-            "status": 200, 
-            "data":bid, 
-            "message": "Fetched bid details for " 
-            + req.params.id, 
+        let bids = await Bid.find({ order: req.params.id, is_delete: 0 })
+            .populate("order")
+            .populate({ path: "seller", select: "name company phone profile" });
+
+        // Bid.find() always returns an array (never null), so empty = no bids yet
+        return res.send({
+            "status": 200,
+            "data": bids,
+            "message": bids.length === 0
+                ? "No bids yet for order " + req.params.id
+                : "Fetched " + bids.length + " bid(s) for order " + req.params.id,
             "error": false
-         });
+        });
     } catch (error) {
         console.log(error);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": false });
+        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
     }
-
-
-
-
-
-
-
-
 
 
 

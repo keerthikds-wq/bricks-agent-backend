@@ -6,62 +6,45 @@ const { StatusCodes } = require("http-status-codes");
 
 
 const addOrder = async (req, res, next) => {
-
-    const {product,user,bid,quantity,longitude,latitude,address} = req.body
-    if(product==''|| user=='' || bid=='' || quantity=='' || longitude=='' || latitude=='' || address==''){
+    // NOTE: bid is NOT required at order creation — a bid is submitted by the seller later
+    const { product, quantity, longitude, latitude, address } = req.body;
+    if (!product || !quantity || !longitude || !latitude || !address) {
         return res.status(StatusCodes.BAD_REQUEST).json({
-            message:"Empty Field not Allowed",
-            status:"Failed"
+            message: "product, quantity, longitude, latitude and address are required",
+            status: "Failed"
         });
-    }else{
-        try {
-                const data={
-                    product,
-                    user:req.user.id,
-                    bid,
-                    quantity,
-                    distance:"4km",
-                    longitude,
-                    latitude,
-                    address,
-                };
-                const updateer=await Order.create(data)
-                if(updateer){
-                    res.status(StatusCodes.CREATED).json({
-                        error: false,
-                        status:"Success",
-                        message:"Order Added Successfully",
-                        data
-                    })
-                }else{
-                    res.status(StatusCodes.BAD_REQUEST).json({
-                        status:"Fail",
-                        message:"Something went wrong",
-                    })
-                }
-               
-        
-        } catch (error) {
-            console.log(error)
-            res.status(500).json(error)
-        }  
-    } 
-
-
-
-
-
-
-
-
-
-   /*  try {
-        const order = await Order.create(req.body);
-        return res.send({ "status": 200, "data": order, "message": "Order created successfully", "error": false });
+    }
+    try {
+        const data = {
+            product,
+            user: req.user.id,
+            quantity,
+            distance: "4km",
+            longitude,
+            latitude,
+            address,
+            status: "pending",
+        };
+        const order = await Order.create(data);
+        if (order) {
+            return res.status(StatusCodes.CREATED).json({
+                error: false,
+                status: "Success",
+                message: "Order Added Successfully",
+                data: order
+            });
+        } else {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                status: "Fail",
+                message: "Something went wrong",
+            });
+        }
     } catch (error) {
         console.log(error);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": false });
-    } */
+        return res.status(500).json({ error: true, message: error.message });
+    }
+
+
 };
 const getOrder = async (req, res, next) => {
     try {
@@ -164,17 +147,18 @@ const getOrderbyUser = async (req, res, next) => {
         }
         let order = await Order.find(condition)
         .populate("user")
-        .populate("product")
-        .populate("bid")
-       /*  .populate({
-            path: 'seller',
-            populate: {
-              path: 'bid',
-              model: 'bid'
-            }
-          }) */
-
-
+        .populate({
+            path: "product",
+            populate: [
+                { path: "category" },
+                { path: "subcategory" },
+                { path: "brand" }
+            ]
+        })
+        .populate({
+            path: "bid",
+            populate: { path: "seller", select: "name company phone profile" }
+        })
         .sort({ createdAt: 'descending' })
         .skip(limit * (page - 1))
         .limit(limit);
@@ -228,31 +212,21 @@ const getOrderAll = async (req, res) => {
         }
         let order = await Order.find(condition)
         .populate("user")
-        .populate("product")
-        .populate("bid")
         .populate({
-            path:"product",
-            model:'product',
-            populate:{
-                path:"category",
-                model:'category'
-            }
+            // Single populate with all nested sub-documents — multiple separate .populate("product")
+            // calls override each other (last one wins), so we must combine them here.
+            path: "product",
+            populate: [
+                { path: "category" },
+                { path: "subcategory" },
+                { path: "brand" }
+            ]
         })
         .populate({
-            path:"product",
-            model:'product',
-            populate:{
-                path:"subcategory",
-                model:'subcategory'
-            }
-        })
-        .populate({
-            path:"product",
-            model:'product',
-            populate:{
-                path:"brand",
-                model:'brand'
-            }
+            // Populate bid AND nest-populate the seller inside it so
+            // Flutter can compare bid.seller._id with the logged-in seller's ID.
+            path: "bid",
+            populate: { path: "seller", select: "name company phone profile" }
         })
         .sort({ createdAt: 'descending' }).skip(limit * (page - 1)).limit(limit);
         // return res.send({ "status": 200, "data": product, "pagination": { pagesCount, orderCount }, "message": "Fetched all products successfully", "error": false });
