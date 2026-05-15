@@ -14,11 +14,13 @@ const addBid = async (req, res, next) => {
 
 const getBidbyOrder = async (req, res) => {
     try {
-        let bids = await Bid.find({ order: req.params.id, is_delete: 0 })
+        // Use $ne:1 so bids without is_delete field still appear.
+        // Sort by price ascending — rank #1 = lowest/best price for the buyer.
+        let bids = await Bid.find({ order: req.params.id, is_delete: { $ne: 1 } })
             .populate("order")
-            .populate({ path: "seller", select: "name company phone profile" });
+            .populate({ path: "seller", select: "name company phone profile" })
+            .sort({ price: 1 });
 
-        // Bid.find() always returns an array (never null), so empty = no bids yet
         return res.send({
             "status": 200,
             "data": bids,

@@ -151,22 +151,37 @@ const getOrderbyUser = async (req, res, next) => {
             .skip(skip)
             .limit(limit);
 
-        // Also return a map of all bids keyed by orderId so the buyer can see bid counts
-        const allBids = await Bid.find({ is_delete: { $ne: 1 } }).select("order price seller description");
-        const bidMap  = {};
+        // Fetch all bids for these orders and attach them as a `bids` array on each order object.
+        // Flutter reads item['bids'] directly on the order — previously they lived in a separate
+        // top-level `bid` map which Flutter never used, so bid count was always 0.
+        const orderIds = orders.map(o => o._id.toString());
+        const allBids = await Bid.find({
+            order: { $in: orderIds },
+            is_delete: { $ne: 1 }
+        })
+            .select("order price seller description delivery_date representative_name representative_no")
+            .populate({ path: "seller", select: "name company phone profile" });
+
+        const bidMap = {};
         allBids.forEach((b) => {
             const key = b.order?.toString();
             if (!key) return;
             if (!bidMap[key]) bidMap[key] = [];
-            bidMap[key].push(b);
+            bidMap[key].push(b.toObject());
+        });
+
+        // Convert Mongoose docs to plain objects and attach bids array
+        const orderObjects = orders.map(order => {
+            const obj = order.toObject();
+            obj.bids = bidMap[order._id.toString()] || [];
+            return obj;
         });
 
         console.log(`getOrderbyUser: user=${req.params.id}, status=${status||'any'}, found=${orders.length}`);
 
         return res.send({
             "status": 200,
-            "data":   orders,
-            "bid":    bidMap,
+            "data":   orderObjects,
             "pagination": { pagesCount, orderCount },
             "message": `Fetched ${orders.length} order(s) for user ${req.params.id}`,
             "error": false
