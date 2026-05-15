@@ -38,9 +38,15 @@ const addRequirement = async (req, res) => {
 // GET /api/requirement — list all open requirements (for sellers to see)
 const getRequirements = async (req, res) => {
     try {
-        const requirements = await Requirement.find({ is_delete: 0, status: "open" })
+        // Use $ne:1 so docs where is_delete is null/missing also appear (more resilient than ===0)
+        const requirements = await Requirement.find({
+            is_delete: { $ne: 1 },
+            status: "open"
+        })
             .populate("user", "name phone profile")
             .sort({ createdAt: -1 });
+
+        console.log(`getRequirements: found=${requirements.length}`);
 
         return res.status(StatusCodes.OK).json({
             error: false,
