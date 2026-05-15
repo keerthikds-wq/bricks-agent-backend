@@ -8,7 +8,13 @@ const {StatusCodes}= require("http-status-codes");
 const getSeller = async (req, res, next) => {
     let id = req.params.id;
     try {
-        const seller = await Seller.findOne({ _id: id, is_delete: 0 });
+        // Use $ne:1 so sellers without the is_delete field (null/missing) are also found.
+        // Old code used is_delete:0 (strict), which caused getSeller to return null
+        // for sellers whose document pre-dates the is_delete field.
+        const seller = await Seller.findOne({ _id: id, is_delete: { $ne: 1 } });
+        if (!seller) {
+            return res.status(404).send({ "status": 404, "data": null, "message": "Seller not found for id " + id, "error": true });
+        }
         return res.send({ "status": 200, "data": seller, "message": "Seller details for " + seller.id, "error": false });
     } catch (error) {
         console.log(error.message);
