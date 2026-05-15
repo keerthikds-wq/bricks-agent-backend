@@ -19,6 +19,14 @@ const bidSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: 'seller',
         },
+        // pending = awaiting buyer decision
+        // accepted = buyer accepted this bid
+        // declined = buyer declined this bid
+        status: {
+            type: String,
+            enum: ['pending', 'accepted', 'declined'],
+            default: 'pending',
+        },
         is_delete: {
             type: Number,
             enum: [0, 1],

@@ -18,9 +18,9 @@ const ordersSchema = new Schema(
             type: Number,
             default: 1
         },
-        distance:{
-            type:String,
-            default:"0"
+        distance: {
+            type: String,
+            default: "0"
         },
         longitude: {
             type: String,
@@ -36,6 +36,11 @@ const ordersSchema = new Schema(
             enum: ["pending", "ongoing", "completed"],
             default: "pending"
         },
+        // Sellers who explicitly declined this order — filtered out of their "All Orders" tab
+        declined_by: [{
+            type: Schema.Types.ObjectId,
+            ref: 'seller',
+        }],
         is_delete: {
             type: Number,
             enum: [0, 1],

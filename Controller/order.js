@@ -202,8 +202,13 @@ const getOrderAll = async (req, res) => {
         const page   = Math.max(1, parseInt(req.query.page)   || 1);
 
         // Use $ne:1 instead of ===0 so documents where is_delete is null/missing also match.
+        // Also filter out orders this seller has explicitly declined.
         const condition = { is_delete: { $ne: 1 } };
         if (status) condition.status = status;
+        // req.user is set by verifyTokenwithAuthorization middleware
+        if (req.user && req.user.id) {
+            condition.declined_by = { $ne: req.user.id };
+        }
 
         const orderCount = await Order.countDocuments(condition);
         const pagesCount = (limit > 0 && orderCount > limit) ? Math.ceil(orderCount / limit) : 1;
@@ -275,4 +280,24 @@ const changeStatus=async (req, res, next) => {
 }
 
 
-module.exports = { changeStatus, getSellersOrders, addOrder, getOrder, getOrderbyUser, getOrderBySeller, getOrderAll };
+// ─── POST /api/order/:id/decline ──────────────────────────────────────────────
+// Seller declines an order — adds their ID to declined_by so it's filtered
+// out of their "All Orders" tab permanently.
+const declineOrder = async (req, res) => {
+    try {
+        const order = await Order.findByIdAndUpdate(
+            req.params.id,
+            { $addToSet: { declined_by: req.user.id } }, // $addToSet prevents duplicates
+            { new: true }
+        );
+        if (!order) {
+            return res.status(404).send({ status: 404, data: null, message: "Order not found", error: true });
+        }
+        return res.send({ status: 200, data: null, message: "Order declined", error: false });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send({ status: 500, data: null, message: error.message, error: true });
+    }
+};
+
+module.exports = { changeStatus, getSellersOrders, addOrder, getOrder, getOrderbyUser, getOrderBySeller, getOrderAll, declineOrder };

@@ -1,17 +1,22 @@
-const { express, app } = require('../config');
+const { express } = require('../config');
 const router = express.Router();
 
-const { addBid, getBidbyOrder, acceptBidForOrder } = require('../Controller/bid');
+const { addBid, getBidbyOrder, getMyBids, acceptBidForOrder, declineBid } = require('../Controller/bid');
 const { sellerAuth, userAuth, verifyTokenwithAuthorization } = require('../Utils');
 
-// POST /api/bid — seller submits a bid (must be authenticated seller)
+// Seller submits a quotation for an order
 router.post('/', sellerAuth, addBid);
 
-// GET /api/bid/order/:id — get all bids for an order (any authenticated user)
+// Seller fetches their own submitted quotations (for "My Quotations" tab)
+router.get('/my', sellerAuth, getMyBids);
+
+// Get all non-declined quotations for an order (buyer view)
 router.get('/order/:id', verifyTokenwithAuthorization, getBidbyOrder);
 
-// POST /api/bid/order — buyer accepts a bid (must be authenticated user/buyer)
+// Buyer accepts a quotation → order goes "ongoing"
 router.post('/order', userAuth, acceptBidForOrder);
 
+// Buyer declines a specific quotation
+router.post('/:id/decline', userAuth, declineBid);
 
 module.exports = router;
