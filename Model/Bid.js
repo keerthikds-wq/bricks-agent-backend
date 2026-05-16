@@ -6,6 +6,11 @@ const bidSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: 'order',
         },
+        // Either order OR requirement must be present (enforced in controller, not schema)
+        requirement: {
+            type: Schema.Types.ObjectId,
+            ref: 'requirement',
+        },
         description: String,
         representative_name: String,
         representative_no: Number,
