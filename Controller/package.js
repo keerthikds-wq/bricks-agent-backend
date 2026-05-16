@@ -1,108 +1,105 @@
-const Package = require("../Model/Package");
-const { StatusCodes } =require("http-status-codes");
+const Package       = require("../Model/Package");
+const { StatusCodes } = require("http-status-codes");
 
-
-    const addpackage=async(req,res)=>{
-        const {month,single,complete} = req.body
-        if(month=='' || single=='' || complete==''){
-            return res.status(StatusCodes.BAD_REQUEST).json({
-                message:"Empty Field not Allowed",
-                status:"Failed"
-            });
-        }else{
-            try {
-                    const data={
-                        month,
-                        single,
-                        complete,
-                    };
-
-                    const getcounteres=await Package.find()
-                    if(getcounteres.length > 5){
-                        res.status(StatusCodes.BAD_REQUEST).json({
-                            code:StatusCodes.BAD_REQUEST,
-                            status:"Failed",
-                            message:"You hav reached the limit of input",
-                        })
-                    }else{
-                        const updateer=await Package.create(data)
-                        if(updateer){
-                            res.status(StatusCodes.CREATED).json({
-                                status:"Success",
-                                message:"Package added",
-                                data
-                            })
-                        }else{
-                            res.status(StatusCodes.BAD_REQUEST).json({
-                                status:"Fail",
-                                message:"Something went wrong",
-                            })
-                        }
-                    }
-                   
-                   
-           
-            } catch (error) {
-                console.log(error)
-                res.status(StatusCodes.INTERNAL_SERVER_ERROR).json(error)
-            }  
-        } 
-    }
-
-    const getPackage=async(req, res)=> {
-        try {
-            const data = await Package.find()
-            if(data.length > 0){
-                res.status(StatusCodes.OK).json({
-                    status:"success",
-                    count:data.length,
-                    data,
-                })
-            }else{
-                return res.status(StatusCodes.NOT_FOUND).json({message: "No Package Yet"});
-            }
-        } catch (error) {
-            console.log(error)
-            res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-                status:"Failed",
-                message:"Something went wrong",
-            })
-        }
-   } 
-
-   const editPackage=async(req, res)=> {   
+// ─── GET /api/packages/get-packages ──────────────────────────────────────────
+// Optional query: ?type=seller | ?type=buyer
+// Returns only active packages unless admin param is set.
+const getPackage = async (req, res) => {
     try {
-        let checkavailability = await Package.findById(req.params.id)
-        if(!checkavailability){
-            res.status(StatusCodes.NOT_FOUND).json({message:"NOT_FOUND"}); 
-        }else{
-            const data={
-                month: req.body.month || checkavailability.month,
-                single: req.body.single || checkavailability.single,
-                complete:req.body.complete || checkavailability.complete,
-            }
-            const successupdate=await Package.findByIdAndUpdate(req.params.id, data, {new:true})
-            if(successupdate){
-                res.status(StatusCodes.OK).json({
-                    status:"success",
-                    message:"Update Successfully",
-                    data
-                })   
-            }else{
-                res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-                    status:"Failed",
-                    message:"Update failed",
-                })
-            }
+        const filter = { active: true };
+        if (req.query.type && ['seller', 'buyer'].includes(req.query.type)) {
+            filter.type = { $in: [req.query.type, 'both'] };
         }
+        const data = await Package.find(filter).sort({ month: 1 });
+        return res.status(StatusCodes.OK).json({
+            status: 'success',
+            count:  data.length,
+            data,
+        });
     } catch (error) {
-        console.log(error)
-        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            status:"Failed",
-            message:"Something went wrong",
-        })
+        console.error('getPackage error:', error);
+        return res.status(500).json({ status: 'Failed', message: 'Something went wrong' });
     }
-} 
+};
 
+// ─── POST /api/packages/add-package (admin only) ──────────────────────────────
+const addpackage = async (req, res) => {
+    const { month, single, complete, label, type, active } = req.body;
+    if (!month || !single || !complete) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'month, single, and complete are required',
+            status:  'Failed',
+        });
+    }
+    try {
+        const count = await Package.countDocuments();
+        if (count >= 10) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                status:  'Failed',
+                message: 'Maximum of 10 packages allowed. Delete an existing one first.',
+            });
+        }
+        const pkg = await Package.create({
+            month:    Number(month),
+            single:   Number(single),
+            complete: Number(complete),
+            label:    label   || '',
+            type:     type    || 'seller',
+            active:   active  !== undefined ? Boolean(active) : true,
+        });
+        return res.status(StatusCodes.CREATED).json({
+            status:  'Success',
+            message: 'Package added',
+            data:    pkg,
+        });
+    } catch (error) {
+        console.error('addpackage error:', error);
+        return res.status(500).json({ status: 'Failed', message: error.message });
+    }
+};
 
-module.exports= {addpackage,getPackage,editPackage}
+// ─── PUT /api/packages/edit-package/:id (admin only) ─────────────────────────
+const editPackage = async (req, res) => {
+    try {
+        const pkg = await Package.findById(req.params.id);
+        if (!pkg) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Package not found' });
+        }
+        const updated = await Package.findByIdAndUpdate(
+            req.params.id,
+            {
+                month:    req.body.month    !== undefined ? Number(req.body.month)    : pkg.month,
+                single:   req.body.single   !== undefined ? Number(req.body.single)   : pkg.single,
+                complete: req.body.complete !== undefined ? Number(req.body.complete) : pkg.complete,
+                label:    req.body.label    !== undefined ? req.body.label    : pkg.label,
+                type:     req.body.type     !== undefined ? req.body.type     : pkg.type,
+                active:   req.body.active   !== undefined ? Boolean(req.body.active) : pkg.active,
+            },
+            { new: true }
+        );
+        return res.status(StatusCodes.OK).json({
+            status:  'success',
+            message: 'Updated successfully',
+            data:    updated,
+        });
+    } catch (error) {
+        console.error('editPackage error:', error);
+        return res.status(500).json({ status: 'Failed', message: error.message });
+    }
+};
+
+// ─── DELETE /api/packages/delete-package/:id (admin only) ────────────────────
+const deletePackage = async (req, res) => {
+    try {
+        const pkg = await Package.findByIdAndDelete(req.params.id);
+        if (!pkg) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Package not found' });
+        }
+        return res.status(StatusCodes.OK).json({ status: 'success', message: 'Package deleted' });
+    } catch (error) {
+        console.error('deletePackage error:', error);
+        return res.status(500).json({ status: 'Failed', message: error.message });
+    }
+};
+
+// ─── GET /api/packages/all (admin only) ────────�

@@ -1,14 +1,15 @@
-const { express, app } = require('../config');
+const { express } = require('../config');
 const router = express.Router();
-//const { auth } = require("../Utils");
-const { sellerAuth,adminAuth,verifyTokenwithAuthorization } = require("../Utils");
-const {addpackage,getPackage,editPackage } = require('../Controller/package');
+const { adminAuth } = require("../Utils");
+const { addpackage, getPackage, getAllPackages, editPackage, deletePackage } = require('../Controller/package');
 
-
-router.post('/add-package',adminAuth, addpackage);
+// Public: get active packages (optional ?type=seller|buyer filter)
 router.get('/get-packages', getPackage);
-router.put('/edit-package/:id',adminAuth, editPackage);
-/*router.get('/get-support/me', sellerAuth, getSupportByUser); */
 
+// Admin-only: manage packages (prices, plans)
+router.get('/all',                      adminAuth, getAllPackages);   // all incl. inactive
+router.post('/add-package',             adminAuth, addpackage);
+router.put('/edit-package/:id',         adminAuth, editPackage);
+router.delete('/delete-package/:id',    adminAuth, deletePackage);
 
 module.exports = router;

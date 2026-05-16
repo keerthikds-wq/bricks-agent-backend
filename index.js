@@ -64,8 +64,13 @@ app.use('/api/auth', authLimiter);
 app.use('/api/admin/login', authLimiter);
 app.use('/api/seller/login', authLimiter);
 
-// Connect DB then mount routes
-connect();
+// Connect DB, seed default data, then mount routes
+connect().then(() => {
+    require('./Utils/seedPackages')();
+}).catch(() => {
+    // connect() may not return a promise in all versions — seed anyway after delay
+    setTimeout(() => require('./Utils/seedPackages')(), 3000);
+});
 app.use('/api', require('./Routes/index'));
 
 // Root route — friendly info instead of "Cannot GET /"

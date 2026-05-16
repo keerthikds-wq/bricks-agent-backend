@@ -276,48 +276,25 @@ exports.deleteSellerNotificatioin=async(req, res)=> {
 
 exports.sendTopicNotification = async (req, res) => {
     const { title, body, topic, message: messageBody } = req.body;
+    if (!topic) return res.status(400).send({ message: 'topic is required', error: true });
     try {
-      let message = {
-        notification: {
-          title,
-          body,
-        },
-        data: {
-          title,
-          body,
-          message: messageBody,
-        },
-  
-        topic,
-        // token: verifye.fcm_token,
-      };
-  
-      FCM.send(message, async function (err, resp) {
-        if (err) {
-          return res.status(500).send({
-            message: err,
-          });
-        } else {
-          await GroupNotification.create({
-            title,
-            body,
-            message: messageBody,
-            notificationid: resp,
-            topic: topic,
-          });
-  
-          console.log({ resp });
-          return res.status(200).send({
-            message: "Notification sent successfully",
-            data: message,
-          });
-        }
-      });
+        const result = await admin.messaging().send({
+            notification: { title, body },
+            data: { title, body, message: messageBody || '' },
+            topic,
+        });
+        await GroupNotification.create({
+            title, body,
+            message: messageBody || '',
+            notificationid: result,
+            topic,
+        }).catch(e => console.error('GroupNotification.create error (non-fatal):', e.message));
+        return res.status(200).send({ message: 'Notification sent successfully', error: false });
     } catch (err) {
-      console.log(err);
-      throw err;
+        console.error('sendTopicNotification error:', err);
+        return res.status(500).send({ message: err.message, error: true });
     }
-  };
+};
   
   exports.getGroupNotification = async (req, res, next) => {
     const { topic } = req.params;

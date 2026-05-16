@@ -25,7 +25,7 @@ const SellerPremiumSchema = new Schema(
         },
         userID:{
             type: Schema.Types.ObjectId,
-            ref:"user"
+            ref:"seller"   // sellers subscribe; ref was incorrectly "user"
         },
         packageID:{
             type: Schema.Types.ObjectId,
