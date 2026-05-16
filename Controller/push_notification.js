@@ -6,197 +6,113 @@ const Sellernotification=require("../Model/Sellernotification");
 const GroupNotification = require("../Model/Groupnotification");
 const User=require("../Model/User")
 const Seller=require("../Model/Seller")
-const crypto = require("crypto");
 const {v4: uuid} = require('uuid');
 
 var serviceAccount=require("../Utils/config.json")
 if (!admin.apps.length) {
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
-const id = uuid()
-// const id = crypto.randomBytes(16).toString();
 
-exports.sendPushNotification =async (req,res,next)=>{
-    const {title,body,message,fcm_token,userid,notificationid}=req.body;
-    const tokenfcm=req.params.fcm_token
-    const verifye=await User.findOne({tokenfcm})
-    try{
-        let message={
-            notification:{
-                title,
-                body,  
-            },
-            data:{
-                title,
-                body,
-                message:req.body.message,
-                fcm_token:`${req.params.fcm_token}`,
-                userid:`${verifye._id}`,
-                notificationid:`${id}`,
-                view:"false",
-                click_action:"FLUTTER_NOTIFICATION_CLICK"
-                
-            },
-        
-            token:req.params.fcm_token,
-
+// ─── Shared helper: send one FCM message via firebase-admin ──────────────────
+// Returns true on success, false on failure (never throws).
+async function _sendFcm(token, title, body, extraData = {}) {
+    if (!token || token === 'user_logged_out') return false;
+    try {
+        await admin.messaging().send({
+            notification: { title, body },
+            data: { title, body, click_action: 'FLUTTER_NOTIFICATION_CLICK', ...extraData },
+            token,
+        });
+        return true;
+    } catch (e) {
+        console.error('_sendFcm error (non-fatal):', e.message);
+        return false;
     }
-    
+}
 
-    const insertNotification= await Notification.create(message.data)
-    //await Notification.findOneAndUpdate(fcm_token,{userid:verify._id},{new:true})
-
-    if(insertNotification){
-        
-
-        FCM.send(message, function(err,resp){
-            if(err){
-                return res.status(500).send({
-                    message:err
-                })
-            }else{
-                return res.status(200).send({
-                    message:"Notification sent successfully",
-                    data:message
-                })
-            }
-        })
-    }else{
-        return res.status(StatusCodes.BAD_REQUEST).send({
-            message:"Oop!!! Something went wrong",
-            code:StatusCodes.BAD_REQUEST
-        })
+// ─── Exported helper: notify ALL sellers of a new requirement ────────────────
+// Called directly from requirement.js — fire-and-forget, no HTTP round-trip.
+exports.notifyAllSellers = async (title, body) => {
+    try {
+        const sellers = await Seller.find({ is_delete: { $ne: 1 } }, 'fcm_token');
+        const results = await Promise.allSettled(
+            sellers
+                .filter(s => s.fcm_token && s.fcm_token !== 'user_logged_out')
+                .map(s => _sendFcm(s.fcm_token, title, body))
+        );
+        const sent = results.filter(r => r.status === 'fulfilled' && r.value).length;
+        console.log(`notifyAllSellers: sent=${sent}/${sellers.length}`);
+    } catch (e) {
+        console.error('notifyAllSellers error (non-fatal):', e.message);
     }
+};
 
-    
-}
-    catch(err){
-        console.log(err)
-        throw err
+// ─── POST /api/push-notification/send-notification/:fcm_token ────────────────
+// Buyer → seller / any FCM token notification (used when seller quotes a buyer)
+exports.sendPushNotification = async (req, res, next) => {
+    const { title, body } = req.body;
+    const token = req.params.fcm_token;
+    try {
+        const notifId = uuid();
+        // Persist to DB (best-effort — look up user by fcm_token)
+        const user = await User.findOne({ fcm_token: token }).catch(() => null);
+        if (user) {
+            await Notification.create({
+                title, body,
+                message: req.body.message || '',
+                fcm_token: token,
+                userid: `${user._id}`,
+                notificationid: notifId,
+                view: 'false',
+                click_action: 'FLUTTER_NOTIFICATION_CLICK',
+            }).catch(() => {});
+        }
+
+        await _sendFcm(token, title, body, { notificationid: notifId });
+        return res.status(200).send({ message: 'Notification sent successfully', error: false });
+    } catch (err) {
+        console.error('sendPushNotification error:', err);
+        return res.status(500).send({ message: err.message, error: true });
     }
+};
+exports.sendAllUserPushNotification = async (req, res, next) => {
+    // Placeholder — not currently used in production
+    return res.status(200).send({ message: 'Not implemented', error: false });
+};
 
-}
-exports.sendAllUserPushNotification =async (req,res,next)=>{
-    const getAllTokens=await User.find()
-    console.log(getAllTokens);
-    // const {title,body,message,fcm_token,userid,notificationid}=req.body;
-    // const tokenfcm=req.body.fcm_token
-    // const verifye=await User.find([{tokenfcm}])
-    // try{
-    //     let message={
-    //         notification:{
-    //             title,
-    //             body,   
-    //         },
-    //         data:{
-    //             title,
-    //             body,
-    //             message:req.body.message,
-    //             fcm_token:[`${req.params.fcm_token}`],
-    //             userid:[`${verifye._id}`],
-    //             notificationid:`${id}`,
-    //             view:"false"
-                
-    //         },
-        
-    //         token:req.body.fcm_token,
-
-    // }
-    
-
-    // const insertNotification= await Allusernotification.create(message.data)
-    //await Notification.findOneAndUpdate(fcm_token,{userid:verify._id},{new:true})
-
-//     if(insertNotification){
-//         FCM.send(message, function(err,resp){
-//             if(err){
-//                 return res.status(500).send({
-//                     message:err
-//                 })
-//             }else{
-//                 return res.status(200).send({
-//                     message:"Notification sent successfully",
-//                     data:message
-//                 })
-//             }
-//         })
-//     }else{
-//         return res.status(StatusCodes.BAD_REQUEST).send({
-//             message:"Oop!!! Something went wrong",
-//             code:StatusCodes.BAD_REQUEST
-//         })
-//     }
-
-    
-// }
-//     catch(err){
-//         console.log(err)
-//         throw err
-//     }
-
-}
-exports.sellerSendPushNotification =async (req,res,next)=>{
-    const {title,body,message,fcm_token,userid,view}=req.body;
+// ─── POST /api/push-notification/send-seller-notification/:id ────────────────
+// Used by send_notification_to_nearby_sellers.dart to notify a single seller
+exports.sellerSendPushNotification = async (req, res, next) => {
+    const { title, body } = req.body;
     const sellerId = req.params.id;
-    const verifye=await Seller.findById(sellerId);
-    try{
-        let message={
-            notification:{
-                title,
-                body,
-                
-                
-            },
-            data:{
-                title,
-                body,
-                message:req.body.message,
-                fcm_token:`${verifye.fcm_token}`,
-                userid:`${verifye._id}`,
-                notificationid:`${id}`,
-                view:"false",
-                click_action:"FLUTTER_NOTIFICATION_CLICK"
-                
-            },
-        
-            token:verifye.fcm_token,
+    try {
+        const seller = await Seller.findById(sellerId);
+        if (!seller) {
+            return res.status(404).send({ message: 'Seller not found', error: true });
+        }
 
+        const notifId = uuid();
+        // Persist notification record
+        await Sellernotification.create({
+            title, body,
+            message: req.body.message || '',
+            fcm_token: `${seller.fcm_token}`,
+            userid: `${seller._id}`,
+            notificationid: notifId,
+            view: 'false',
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        }).catch(e => console.error('Sellernotification.create error (non-fatal):', e.message));
+
+        await _sendFcm(seller.fcm_token, title, body, {
+            userid: `${seller._id}`,
+            notificationid: notifId,
+        });
+        return res.status(200).send({ message: 'Notification sent', error: false });
+    } catch (err) {
+        console.error('sellerSendPushNotification error:', err);
+        return res.status(500).send({ message: err.message, error: true });
     }
-    
-
-    const insertNotification= await Sellernotification.create(message.data)
-    //await Notification.findOneAndUpdate(fcm_token,{userid:verify._id},{new:true})
-
-    if(insertNotification){
-        
-
-        FCM.send(message, function(err,resp){
-            if(err){
-                return res.status(500).send({
-                    message:err
-                })
-            }else{
-                return res.status(200).send({
-                    message:"Notification sent successfully",
-                    data:message
-                })
-            }
-        })
-    }else{
-        return res.status(StatusCodes.BAD_REQUEST).send({
-            message:"Oop!!! Something went wrong",
-            code:StatusCodes.BAD_REQUEST
-        })
-    }
-
-    
-}
-    catch(err){
-        console.log(err)
-        throw err
-    }
-
-}
+};
 
 exports.getUserNotification=async(req,res,next)=>{
     const userid=req.user.id

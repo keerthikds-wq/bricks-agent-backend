@@ -8,7 +8,7 @@ const Requirement = require("../Model/Requirement");
 const addBid = async (req, res) => {
     const {
         order, requirement,
-        description, price,
+        description, price, price_unit,
         representative_name, representative_no, delivery_date,
     } = req.body;
 
@@ -38,6 +38,7 @@ const addBid = async (req, res) => {
         const bidData = {
             seller: req.user.id,
             price: Number(price),
+            price_unit: price_unit || "Total",
             description: description || "",
             representative_name: representative_name || "",
             representative_no: representative_no || null,

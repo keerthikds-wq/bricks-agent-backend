@@ -20,6 +20,11 @@ const bidSchema = new Schema(
         delivery_date: {
             type: String,
         },
+        // e.g. "Total", "Per Bag", "Per Ton", "Per KG", "Per Piece", "Per Sqft"
+        price_unit: {
+            type: String,
+            default: 'Total',
+        },
         seller: {
             type: Schema.Types.ObjectId,
             ref: 'seller',

@@ -1,5 +1,6 @@
 const Requirement = require("../Model/Requirement");
 const { StatusCodes } = require("http-status-codes");
+const { notifyAllSellers } = require("./push_notification");
 
 // POST /api/requirement — buyer posts a new requirement
 const addRequirement = async (req, res) => {
@@ -20,6 +21,13 @@ const addRequirement = async (req, res) => {
             message: message || "",
             user: req.user.id,
         });
+
+        // Notify all sellers asynchronously — fire-and-forget, non-fatal
+        const notifTitle = '🔔 New buyer requirement near you!';
+        const notifBody  = `${title.trim()} — ${quantity} ${unit || 'Bags'}`;
+        notifyAllSellers(notifTitle, notifBody).catch(e =>
+            console.error('notifyAllSellers error (non-fatal):', e.message)
+        );
 
         return res.status(StatusCodes.CREATED).json({
             error: false,
@@ -43,7 +51,8 @@ const getRequirements = async (req, res) => {
             is_delete: { $ne: 1 },
             status: "open"
         })
-            .populate("user", "name phone profile")
+            // Include fcm_token so sellers can send push notifications to the buyer
+            .populate("user", "name phone profile fcm_token")
             .sort({ createdAt: -1 });
 
         console.log(`getRequirements: found=${requirements.length}`);
