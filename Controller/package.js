@@ -102,4 +102,15 @@ const deletePackage = async (req, res) => {
     }
 };
 
-// ─── GET /api/packages/all (admin only) ────────�
+// ─── GET /api/packages/all (admin only) ──────────────────────────────────────
+const getAllPackages = async (req, res) => {
+    try {
+        const data = await Package.find({}).sort({ type: 1, month: 1 });
+        return res.status(200).json({ status: 'success', count: data.length, data });
+    } catch (error) {
+        console.error('getAllPackages error:', error);
+        return res.status(500).json({ status: 'Failed', message: 'Something went wrong' });
+    }
+};
+
+module.exports = { addpackage, getPackage, getAllPackages, editPackage, deletePackage };

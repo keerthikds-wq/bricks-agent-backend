@@ -58,21 +58,24 @@ const getOrder = async (req, res, next) => {
 
 
 
-const getSellersOrders= async (req, res, next) => {
-    /* try {
-        const userid= req.user.id;
-        const checkUser= await Order.find()
-        if(checkUser){
-            return "hello"
-        }else{
-            return "err"
-        }
+const getSellersOrders = async (req, res, next) => {
+    // Returns all orders that belong to the authenticated buyer
+    try {
+        const userId = req.user.id;
+        const orders = await Order.find({ user: userId })
+            .populate('product')
+            .sort({ createdAt: -1 });
+        return res.status(200).json({
+            status: 200,
+            error: false,
+            message: 'Orders fetched successfully',
+            data: orders,
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ status: 500, error: true, message: error.message, data: null });
     }
-    catch(error){
-        return error;
-    } */
-    console.log("hello");
-}
+};
 
 
 
@@ -294,6 +297,14 @@ const declineOrder = async (req, res) => {
             return res.status(404).send({ status: 404, data: null, message: "Order not found", error: true });
         }
         return res.send({ status: 200, data: null, message: "Order declined", error: false });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send({ status: 500, data: null, message: error.message, error: true });
+    }
+};
+
+module.exports = { changeStatus, getSellersOrders, addOrder, getOrder, getOrderbyUser, getOrderBySeller, getOrderAll, declineOrder };
+false });
     } catch (error) {
         console.log(error);
         return res.status(500).send({ status: 500, data: null, message: error.message, error: true });
