@@ -85,8 +85,11 @@ The bash syntax check is the ground truth for what Render will see.
 
 - Backend live URL: https://bricks-agent-backend.onrender.com/
 - Auto-deploys on push to `main`
-- Render runs Node.js — any syntax error in any `require()`d file crashes the entire server
+- Render runs Node.js v26 — any syntax error in any `require()`d file crashes the entire server
 - After pushing, watch Render logs for `SyntaxError` or `Cannot find module` before assuming deploy succeeded
+- Render retries deploys — if it failed once and then succeeded, the latest successful run is what matters
+- The `MemoryStore` session warning is harmless (expected on free tier with no Redis)
+- NEVER use Unicode box-drawing chars (─, —, │) in .js files — use plain ASCII dashes in comments
 
 ---
 

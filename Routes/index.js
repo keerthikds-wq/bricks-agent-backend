@@ -25,4 +25,8 @@ router.use('/requirement', require("./requirement"));
 router.use('/masonry',          require("./masonry"));
 router.use('/masonry-premiums', require("./masonry_premium"));
 router.use('/builder',          require("./builder"));
-// router.use('/notification', require("./notification")
+// router.use('/notification', require("./notification"));
+// router.use('/cart', require("./cart"));
+// router.use('/wishlist', require("./wishlist"));
+
+module.exports = router;
