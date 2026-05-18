@@ -1,7 +1,7 @@
 /**
  * seedPackages.js
  * Upsert default subscription packages on server startup.
- * Safe to run multiple times — only inserts missing type+month combos.
+ * Safe to run multiple times - only inserts missing type+month combos.
  */
 
 const Package = require('../Model/Package');
