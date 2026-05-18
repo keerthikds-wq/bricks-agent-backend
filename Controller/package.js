@@ -1,16 +1,15 @@
 const Package       = require("../Model/Package");
 const { StatusCodes } = require("http-status-codes");
 
-// ─── GET /api/packages/get-packages ──────────────────────────────────────────
-// Optional query: ?type=seller | ?type=buyer
-// Returns only active packages unless admin param is set.
+const VALID_TYPES = ['seller', 'builder_pro', 'masonry', 'free'];
+
 const getPackage = async (req, res) => {
     try {
         const filter = { active: true };
-        if (req.query.type && ['seller', 'buyer'].includes(req.query.type)) {
-            filter.type = { $in: [req.query.type, 'both'] };
+        if (req.query.type && VALID_TYPES.includes(req.query.type)) {
+            filter.type = req.query.type;
         }
-        const data = await Package.find(filter).sort({ month: 1 });
+        const data = await Package.find(filter).sort({ type: 1, month: 1 });
         return res.status(StatusCodes.OK).json({
             status: 'success',
             count:  data.length,
@@ -22,30 +21,36 @@ const getPackage = async (req, res) => {
     }
 };
 
-// ─── POST /api/packages/add-package (admin only) ──────────────────────────────
 const addpackage = async (req, res) => {
-    const { month, single, complete, label, type, active } = req.body;
+    const { month, single, complete, label, type, active, features } = req.body;
     if (!month || !single || !complete) {
         return res.status(StatusCodes.BAD_REQUEST).json({
             message: 'month, single, and complete are required',
             status:  'Failed',
         });
     }
+    if (type && !VALID_TYPES.includes(type)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'type must be one of: ' + VALID_TYPES.join(', '),
+            status:  'Failed',
+        });
+    }
     try {
         const count = await Package.countDocuments();
-        if (count >= 10) {
+        if (count >= 20) {
             return res.status(StatusCodes.BAD_REQUEST).json({
                 status:  'Failed',
-                message: 'Maximum of 10 packages allowed. Delete an existing one first.',
+                message: 'Maximum of 20 packages allowed. Delete an existing one first.',
             });
         }
         const pkg = await Package.create({
             month:    Number(month),
             single:   Number(single),
             complete: Number(complete),
-            label:    label   || '',
-            type:     type    || 'seller',
-            active:   active  !== undefined ? Boolean(active) : true,
+            label:    label    || '',
+            type:     type     || 'seller',
+            features: Array.isArray(features) ? features : [],
+            active:   active !== undefined ? Boolean(active) : true,
         });
         return res.status(StatusCodes.CREATED).json({
             status:  'Success',
@@ -58,22 +63,28 @@ const addpackage = async (req, res) => {
     }
 };
 
-// ─── PUT /api/packages/edit-package/:id (admin only) ─────────────────────────
 const editPackage = async (req, res) => {
     try {
         const pkg = await Package.findById(req.params.id);
         if (!pkg) {
             return res.status(StatusCodes.NOT_FOUND).json({ message: 'Package not found' });
         }
+        if (req.body.type && !VALID_TYPES.includes(req.body.type)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'type must be one of: ' + VALID_TYPES.join(', '),
+                status:  'Failed',
+            });
+        }
         const updated = await Package.findByIdAndUpdate(
             req.params.id,
             {
-                month:    req.body.month    !== undefined ? Number(req.body.month)    : pkg.month,
-                single:   req.body.single   !== undefined ? Number(req.body.single)   : pkg.single,
-                complete: req.body.complete !== undefined ? Number(req.body.complete) : pkg.complete,
-                label:    req.body.label    !== undefined ? req.body.label    : pkg.label,
-                type:     req.body.type     !== undefined ? req.body.type     : pkg.type,
-                active:   req.body.active   !== undefined ? Boolean(req.body.active) : pkg.active,
+                month:    req.body.month     !== undefined ? Number(req.body.month)    : pkg.month,
+                single:   req.body.single    !== undefined ? Number(req.body.single)   : pkg.single,
+                complete: req.body.complete  !== undefined ? Number(req.body.complete) : pkg.complete,
+                label:    req.body.label     !== undefined ? req.body.label            : pkg.label,
+                type:     req.body.type      !== undefined ? req.body.type             : pkg.type,
+                features: req.body.features  !== undefined ? req.body.features         : pkg.features,
+                active:   req.body.active    !== undefined ? Boolean(req.body.active)  : pkg.active,
             },
             { new: true }
         );
@@ -88,7 +99,6 @@ const editPackage = async (req, res) => {
     }
 };
 
-// ─── DELETE /api/packages/delete-package/:id (admin only) ────────────────────
 const deletePackage = async (req, res) => {
     try {
         const pkg = await Package.findByIdAndDelete(req.params.id);
@@ -102,7 +112,6 @@ const deletePackage = async (req, res) => {
     }
 };
 
-// ─── GET /api/packages/all (admin only) ──────────────────────────────────────
 const getAllPackages = async (req, res) => {
     try {
         const data = await Package.find({}).sort({ type: 1, month: 1 });

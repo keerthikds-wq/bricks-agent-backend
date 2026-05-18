@@ -43,7 +43,15 @@ const userSchema = new Schema(
         isUser:{
             type:Boolean,
             default: true
-        }
+        },
+        subscription_tier: {
+            type: String,
+            enum: ['free', 'builder_pro'],
+            default: 'free',
+        },
+        subscription_expires_at: {
+            type: Date,
+        },
     },
     { timestamps: true }
 );
