@@ -304,11 +304,3 @@ const declineOrder = async (req, res) => {
 };
 
 module.exports = { changeStatus, getSellersOrders, addOrder, getOrder, getOrderbyUser, getOrderBySeller, getOrderAll, declineOrder };
-false });
-    } catch (error) {
-        console.log(error);
-        return res.status(500).send({ status: 500, data: null, message: error.message, error: true });
-    }
-};
-
-module.exports = { changeStatus, getSellersOrders, addOrder, getOrder, getOrderbyUser, getOrderBySeller, getOrderAll, declineOrder };
