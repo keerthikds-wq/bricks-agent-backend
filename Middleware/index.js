@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 /**
- * Core token extractor — sets req.user and calls next().
+ * Core token extractor -- sets req.user and calls next().
  * Responds 401/403 if the token is missing or invalid.
  */
 const auth = (req, res, next) => {
@@ -46,14 +46,30 @@ const adminAuth = (req, res, next) => {
     });
 };
 
-/** Allows any authenticated role */
+/** Requires the caller to be a Masonry contractor */
+const masonryAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && req.user.isMasonry) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: Masonry contractors only.', error: true });
+    });
+};
+
+/** Requires the caller to be a Builder */
+const builderAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && req.user.isBuilder) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: Builders only.', error: true });
+    });
+};
+
+/** Allows any authenticated role (including masonry and builder) */
 const verifyTokenwithAuthorization = (req, res, next) => {
     auth(req, res, () => {
-        if (req.user && (req.user.isAdmin || req.user.isSeller || req.user.isUser)) {
+        if (req.user && (req.user.isAdmin || req.user.isSeller || req.user.isUser || req.user.isMasonry || req.user.isBuilder)) {
             return next();
         }
         return res.status(403).json({ status: 403, message: 'You are not authorized.', error: true });
     });
 };
 
-module.exports = { Auth, auth, adminAuth, sellerAuth, userAuth, verifyTokenwithAuthorization };
+module.exports = { Auth, auth, adminAuth, sellerAuth, userAuth, masonryAuth, builderAuth, verifyTokenwithAuthorization };
