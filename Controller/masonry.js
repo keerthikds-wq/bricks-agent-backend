@@ -87,14 +87,15 @@ const deleteMasonry = async (req, res) => {
 };
 
 // ── GET /api/masonry/nearby?lat=&lng=&radius=&specialization= ─────────────────
-//   Returns masonry contractors within `radius` km (default: service_radius_km)
-//   sorted nearest-first, optionally filtered by specialization.
+//   Returns masonry contractors within `radius` km sorted nearest-first.
+//   Falls back to all active masonries if geo-query returns nothing
+//   (handles existing accounts registered without location data).
 const searchNearby = async (req, res) => {
     try {
-        const lat           = parseFloat(req.query.lat);
-        const lng           = parseFloat(req.query.lng);
-        const radiusKm      = parseFloat(req.query.radius) || 20;
-        const specialization = req.query.specialization;   // optional filter
+        const lat            = parseFloat(req.query.lat);
+        const lng            = parseFloat(req.query.lng);
+        const radiusKm       = parseFloat(req.query.radius) || 20;
+        const specialization = req.query.specialization;
 
         if (isNaN(lat) || isNaN(lng)) {
             return res.status(400).json({
@@ -104,26 +105,34 @@ const searchNearby = async (req, res) => {
             });
         }
 
-        const filter = {
+        const geoFilter = {
             is_delete: { $ne: 1 },
+            // Exclude accounts still at default [0,0] coordinates
+            'location.coordinates': { $ne: [0, 0] },
             location: {
                 $near: {
                     $geometry: { type: 'Point', coordinates: [lng, lat] },
-                    $maxDistance: radiusKm * 1000,  // metres
+                    $maxDistance: radiusKm * 1000,
                 },
             },
         };
+        if (specialization) geoFilter.specializations = specialization;
 
-        if (specialization) {
-            filter.specializations = specialization;
+        let results = await Masonry.find(geoFilter).limit(50);
+
+        // Fallback: if geo-query finds nothing (e.g. all accounts have default coords),
+        // return all active masonries so the app is never empty.
+        if (results.length === 0) {
+            const fallbackFilter = { is_delete: { $ne: 1 } };
+            if (specialization) fallbackFilter.specializations = specialization;
+            results = await Masonry.find(fallbackFilter).sort({ createdAt: -1 }).limit(50);
         }
 
-        const results = await Masonry.find(filter).limit(50);
         return res.json({
             status: 200,
             data: results,
             count: results.length,
-            message: `Found ${results.length} masonry contractor(s) within ${radiusKm} km`,
+            message: `Found ${results.length} masonry contractor(s)`,
             error: false,
         });
     } catch (error) {
@@ -135,7 +144,7 @@ const searchNearby = async (req, res) => {
 // ── PATCH /api/masonry/update-token ───────────────────────────────────────────
 const updateFcmToken = async (req, res) => {
     try {
-        const masonryId = req.user.id;
+        const masonryId  = req.user.id;
         const contractor = await Masonry.findById(masonryId);
         if (!contractor) {
             return res.status(StatusCodes.NOT_FOUND).json({

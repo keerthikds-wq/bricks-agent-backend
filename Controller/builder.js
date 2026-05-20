@@ -23,7 +23,6 @@ const getBuilder = async (req, res) => {
 // ── PATCH /api/builder/:id ────────────────────────────────────────────────────
 const updateBuilder = async (req, res) => {
     try {
-        // Accept either a base64 data URI (JSON body) or multipart file
         if (req.body.profileBase64) {
             try {
                 const result = await cloudinary.uploader.upload(req.body.profileBase64, {
@@ -87,14 +86,15 @@ const deleteBuilder = async (req, res) => {
 };
 
 // ── GET /api/builder/nearby?lat=&lng=&radius=&project_type= ──────────────────
-//   Returns builders within `radius` km sorted nearest-first,
-//   optionally filtered by project_type.
+//   Returns builders within `radius` km sorted nearest-first.
+//   Falls back to all active builders if geo-query returns nothing
+//   (handles existing accounts registered without location data).
 const searchNearby = async (req, res) => {
     try {
         const lat          = parseFloat(req.query.lat);
         const lng          = parseFloat(req.query.lng);
         const radiusKm     = parseFloat(req.query.radius) || 50;
-        const project_type = req.query.project_type;   // optional filter
+        const project_type = req.query.project_type;
 
         if (isNaN(lat) || isNaN(lng)) {
             return res.status(400).json({
@@ -104,26 +104,34 @@ const searchNearby = async (req, res) => {
             });
         }
 
-        const filter = {
+        const geoFilter = {
             is_delete: { $ne: 1 },
+            // Exclude accounts still at default [0,0] coordinates
+            'location.coordinates': { $ne: [0, 0] },
             location: {
                 $near: {
                     $geometry: { type: 'Point', coordinates: [lng, lat] },
-                    $maxDistance: radiusKm * 1000,  // metres
+                    $maxDistance: radiusKm * 1000,
                 },
             },
         };
+        if (project_type) geoFilter.project_types = project_type;
 
-        if (project_type) {
-            filter.project_types = project_type;
+        let results = await Builder.find(geoFilter).limit(50);
+
+        // Fallback: if geo-query finds nothing (e.g. all accounts have default coords),
+        // return all active builders so the app is never empty.
+        if (results.length === 0) {
+            const fallbackFilter = { is_delete: { $ne: 1 } };
+            if (project_type) fallbackFilter.project_types = project_type;
+            results = await Builder.find(fallbackFilter).sort({ createdAt: -1 }).limit(50);
         }
 
-        const results = await Builder.find(filter).limit(50);
         return res.json({
             status: 200,
             data: results,
             count: results.length,
-            message: `Found ${results.length} builder(s) within ${radiusKm} km`,
+            message: `Found ${results.length} builder(s)`,
             error: false,
         });
     } catch (error) {
