@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f7"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="455" rx="180" ry="14" fill="#000" opacity="0.15"/>
+  <g transform="translate(80,80) rotate(-3 176 180)">
+    <polygon points="0,30 352,0 360,340 8,360" fill="#f8fafc" stroke="#475569" stroke-width="3"/>
+    <g stroke="#94a3b8" stroke-width="1.5" fill="none" opacity="0.8">
+      <path d="M20 80 Q80 100 140 75 Q200 50 260 90 Q320 130 350 100"/>
+      <path d="M40 180 Q100 200 180 170 Q260 140 340 190"/>
+      <path d="M10 280 Q70 300 130 270 Q200 240 270 290 Q330 320 360 290"/>
+      <path d="M150 50 Q170 100 160 150 Q150 200 180 250"/>
+      <path d="M250 60 Q270 130 260 200 Q250 260 280 320"/>
+    </g>
+    <g stroke="#cbd5e1" stroke-width="0.8" fill="none" opacity="0.6">
+      <path d="M50 120 Q120 140 200 120"/>
+      <path d="M180 220 Q250 240 320 220"/>
+      <path d="M30 320 Q100 340 170 320"/>
+    </g>
+    <polygon points="0,30 80,28 90,340 8,360" fill="#fff" opacity="0.3"/>
+  </g>
+  <rect x="170" y="40" width="172" height="35" rx="5" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+  <text x="256" y="63" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e3a8a" text-anchor="middle">MARBLE SLAB</text>
+</svg>

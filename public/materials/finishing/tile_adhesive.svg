@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f7"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="455" rx="180" ry="14" fill="#000" opacity="0.15"/>
+  <g>
+    <path d="M120 130 Q130 110 160 105 L352 105 Q382 110 392 130 L400 420 Q395 440 370 444 L142 444 Q117 440 112 420 Z" fill="#fed7aa" stroke="#7c2d12" stroke-width="3"/>
+    <path d="M150 105 Q256 90 362 105 L355 130 Q256 118 157 130 Z" fill="#7c2d12"/>
+    <rect x="135" y="200" width="242" height="140" fill="#fff" stroke="#7c2d12" stroke-width="2"/>
+    <text x="256" y="240" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#7c2d12" text-anchor="middle">TILE</text>
+    <text x="256" y="275" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#7c2d12" text-anchor="middle">ADHESIVE</text>
+    <text x="256" y="310" font-family="Arial, sans-serif" font-size="14" fill="#9a3412" text-anchor="middle">20 KG</text>
+  </g>
+</svg>

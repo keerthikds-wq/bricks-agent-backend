@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5efe6"/>
+      <stop offset="1" stop-color="#e8ddc9"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="455" rx="180" ry="14" fill="#000" opacity="0.15"/>
+  <!-- AAC Block - lightweight autoclaved concrete -->
+  <g>
+    <polygon points="100,380 256,330 412,380 412,430 256,470 100,430" fill="#e7e5e4" stroke="#44403c" stroke-width="3"/>
+    <rect x="100" y="220" width="312" height="200" fill="#f5f5f4" stroke="#44403c" stroke-width="3"/>
+    <polygon points="100,220 256,170 412,220 256,260" fill="#fafaf9" stroke="#44403c" stroke-width="3"/>
+    <polygon points="412,220 412,420 460,400 460,200" fill="#d6d3d1" stroke="#44403c" stroke-width="3"/>
+    <!-- Aerated texture - small dots indicating air bubbles -->
+    <g fill="#a8a29e" opacity="0.6">
+      <circle cx="140" cy="260" r="3"/>
+      <circle cx="180" cy="280" r="2"/>
+      <circle cx="220" cy="270" r="3"/>
+      <circle cx="260" cy="290" r="2"/>
+      <circle cx="300" cy="280" r="3"/>
+      <circle cx="340" cy="270" r="2"/>
+      <circle cx="380" cy="290" r="3"/>
+      <circle cx="160" cy="320" r="2"/>
+      <circle cx="200" cy="340" r="3"/>
+      <circle cx="240" cy="330" r="2"/>
+      <circle cx="280" cy="350" r="3"/>
+      <circle cx="320" cy="340" r="2"/>
+      <circle cx="360" cy="330" r="3"/>
+      <circle cx="180" cy="380" r="2"/>
+      <circle cx="280" cy="390" r="3"/>
+      <circle cx="350" cy="380" r="2"/>
+    </g>
+  </g>
+  <!-- Label -->
+  <rect x="170" y="100" width="172" height="40" rx="5" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+  <text x="256" y="126" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#7c2d12" text-anchor="middle">AAC BLOCK</text>
+</svg>

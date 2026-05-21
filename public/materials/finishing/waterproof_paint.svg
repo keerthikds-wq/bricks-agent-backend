@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f7"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="455" rx="180" ry="14" fill="#000" opacity="0.15"/>
+  <g>
+    <ellipse cx="256" cy="160" rx="110" ry="25" fill="#15803d" stroke="#14532d" stroke-width="3"/>
+    <path d="M146 160 L160 400 Q160 420 256 425 Q352 420 352 400 L366 160 Z" fill="#16a34a" stroke="#14532d" stroke-width="3"/>
+    <ellipse cx="256" cy="160" rx="100" ry="20" fill="#14532d"/>
+    <ellipse cx="256" cy="160" rx="90" ry="15" fill="#15803d"/>
+    <path d="M170 165 Q140 100 256 95 Q372 100 342 165" stroke="#14532d" stroke-width="6" fill="none"/>
+    <rect x="170" y="220" width="172" height="100" fill="#fff" stroke="#14532d" stroke-width="2"/>
+    <text x="256" y="250" font-family="Georgia, serif" font-size="22" font-weight="bold" fill="#14532d" text-anchor="middle">EXTERIOR</text>
+    <text x="256" y="278" font-family="Georgia, serif" font-size="22" font-weight="bold" fill="#14532d" text-anchor="middle">PAINT</text>
+    <text x="256" y="305" font-family="Arial, sans-serif" font-size="13" fill="#14532d" text-anchor="middle">WEATHER PROOF</text>
+  </g>
+</svg>

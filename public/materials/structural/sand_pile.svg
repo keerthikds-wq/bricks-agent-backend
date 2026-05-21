@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5efe6"/>
+      <stop offset="1" stop-color="#e8ddc9"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="455" rx="180" ry="14" fill="#000" opacity="0.15"/>
+  <!-- Sand pile -->
+  <path d="M70 410 Q256 180 442 410 Z" fill="#d4a574" stroke="#8b5a2b" stroke-width="3"/>
+  <path d="M70 410 Q256 180 442 410 Z" fill="url(#sandshade)"/>
+  <defs>
+    <linearGradient id="sandshade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <!-- Highlight -->
+  <path d="M180 350 Q220 250 256 200 Q280 240 290 290" stroke="#f4d3a4" stroke-width="4" fill="none" opacity="0.7"/>
+  <!-- Grain texture -->
+  <g fill="#8b5a2b" opacity="0.5">
+    <circle cx="150" cy="380" r="2"/>
+    <circle cx="180" cy="390" r="1.5"/>
+    <circle cx="210" cy="370" r="2"/>
+    <circle cx="240" cy="385" r="1.5"/>
+    <circle cx="270" cy="375" r="2"/>
+    <circle cx="300" cy="390" r="1.5"/>
+    <circle cx="330" cy="370" r="2"/>
+    <circle cx="360" cy="385" r="1.5"/>
+    <circle cx="200" cy="320" r="1.5"/>
+    <circle cx="280" cy="310" r="2"/>
+    <circle cx="320" cy="330" r="1.5"/>
+    <circle cx="220" cy="260" r="1.5"/>
+    <circle cx="280" cy="250" r="2"/>
+  </g>
+  <g fill="#fef3c7" opacity="0.6">
+    <circle cx="160" cy="370" r="1"/>
+    <circle cx="220" cy="380" r="1"/>
+    <circle cx="290" cy="365" r="1"/>
+    <circle cx="350" cy="375" r="1"/>
+    <circle cx="240" cy="290" r="1"/>
+    <circle cx="270" cy="320" r="1"/>
+  </g>
+  <!-- Label -->
+  <rect x="180" y="120" width="152" height="40" rx="5" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+  <text x="256" y="146" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#7c2d12" text-anchor="middle">RIVER SAND</text>
+</svg>
