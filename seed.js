@@ -12,6 +12,11 @@
 
 require("dotenv").config();
 
+// Force Google DNS — fixes querySrv ECONNREFUSED on restrictive networks
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
+dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+
 const fs       = require("fs");
 const path     = require("path");
 const mongoose = require("mongoose");
@@ -39,7 +44,8 @@ async function uploadSvg(category, filename) {
   // Check if already uploaded to Cloudinary
   try {
     const existing = await cloudinary.api.resource(publicId, { resource_type: "image" });
-    _cache[cacheKey] = { public_id: existing.public_id, secure_url: existing.secure_url };
+    const pngUrl = existing.secure_url.replace("/upload/", "/upload/f_png,w_400,h_400,c_pad,b_white/");
+    _cache[cacheKey] = { public_id: existing.public_id, secure_url: pngUrl };
     console.log(`   ⏩ cached  ${filename}`);
     return _cache[cacheKey];
   } catch (_) { /* not found, upload below */ }
@@ -49,12 +55,14 @@ async function uploadSvg(category, filename) {
   }
 
   const result = await cloudinary.uploader.upload(localPath, {
-    public_id,
+    public_id: publicId,
     overwrite:     true,
     resource_type: "image",
     format:        "svg",
   });
-  _cache[cacheKey] = { public_id: result.public_id, secure_url: result.secure_url };
+  // Use f_png transformation so Flutter can render it (no SVG decoder needed)
+  const pngUrl = result.secure_url.replace("/upload/", "/upload/f_png,w_400,h_400,c_pad,b_white/");
+  _cache[cacheKey] = { public_id: result.public_id, secure_url: pngUrl };
   console.log(`   ☁  uploaded ${filename}`);
   return _cache[cacheKey];
 }
