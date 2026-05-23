@@ -27,6 +27,7 @@ router.use('/masonry-premiums', require("./masonry_premium"));
 router.use('/builder',          require("./builder"));
 router.use('/boq',              require("./boq"));
 router.use('/rfq',              require("./rfq"));
+router.use('/price-trends',     require("./price_trend"));
 // router.use('/notification', require("./notification"));
 // router.use('/cart', require("./cart"));
 // router.use('/wishlist', require("./wishlist"));
