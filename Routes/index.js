@@ -29,6 +29,8 @@ router.use('/boq',              require("./boq"));
 router.use('/rfq',              require("./rfq"));
 router.use('/price-trends',     require("./price_trend"));
 router.use('/reviews',          require("./review"));
+router.use('/inventory',        require("./inventory"));
+router.use('/timelines',        require("./project_timeline"));
 // router.use('/notification', require("./notification"));
 // router.use('/cart', require("./cart"));
 // router.use('/wishlist', require("./wishlist"));
