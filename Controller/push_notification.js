@@ -319,3 +319,25 @@ exports.sendTopicNotification = async (req, res) => {
       });
     }
   };
+
+// ─── PATCH /mark-all-read — buyer ─────────────────────────────────────────────
+exports.markAllUserNotificationsRead = async (req, res) => {
+    try {
+        const userid = req.user?.id || req.user?._id;
+        await Allusernotification.updateMany({ userid, view: "false" }, { view: "true" });
+        res.status(200).json({ message: "All marked as read" });
+    } catch (err) {
+        res.status(500).json({ message: "Server error", error: err.message });
+    }
+};
+
+// ─── PATCH /mark-all-read — seller ───────────────────────────────────────────
+exports.markAllSellerNotificationsRead = async (req, res) => {
+    try {
+        const userid = req.user?.id || req.user?._id;
+        await Sellernotification.updateMany({ userid, view: "false" }, { view: "true" });
+        res.status(200).json({ message: "All marked as read" });
+    } catch (err) {
+        res.status(500).json({ message: "Server error", error: err.message });
+    }
+};
