@@ -47,7 +47,9 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 app.use('/api/admin/login', authLimiter);
-app.use('/api/seller/login', authLimiter);
+app.use('/api/seller/login',  authLimiter);
+app.use('/api/builder/login', authLimiter);
+app.use('/api/masonry/login',  authLimiter);
 
 // Connect DB, seed default data, auto-seed price trends
 connect().then(async () => {

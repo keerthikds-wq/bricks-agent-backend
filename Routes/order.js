@@ -4,15 +4,15 @@ const { changeStatus,getSellersOrders,addOrder, getOrder, getOrderbyUser, getOrd
 const { adminAuth,userAuth,verifyTokenwithAuthorization,sellerAuth } = require('../Utils');
 
 
-router.post('/',userAuth, addOrder);
-// router.post('/',auth, addOrder);
-router.get('/:id',verifyTokenwithAuthorization, getOrder);
-router.get('/seller/:id',verifyTokenwithAuthorization, getOrderBySeller);
-router.get('/user/:id',verifyTokenwithAuthorization, getOrderbyUser);
-router.get('/',verifyTokenwithAuthorization, getOrderAll);
-router.get('/get-user-order',userAuth,getSellersOrders);
-router.put('/complete-order/:id',verifyTokenwithAuthorization,changeStatus);
-// Seller declines an order (hides it from their feed permanently)
+// Named/static routes before wildcard /:id
+router.post('/', userAuth, addOrder);
+router.get('/get-user-order', userAuth, getSellersOrders);     // must be before /:id
+router.get('/seller/:id', verifyTokenwithAuthorization, getOrderBySeller);
+router.get('/user/:id', verifyTokenwithAuthorization, getOrderbyUser);
+router.get('/', verifyTokenwithAuthorization, getOrderAll);
+// Wildcard routes last
+router.get('/:id', verifyTokenwithAuthorization, getOrder);
+router.put('/complete-order/:id', sellerAuth, changeStatus);   // only seller can complete
 router.post('/:id/decline', sellerAuth, declineOrder);
 
 module.exports = router;

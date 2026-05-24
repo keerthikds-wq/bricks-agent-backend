@@ -12,7 +12,7 @@ const randomString = () => {
 
 const verifyTokenwithAuthorization = (req, res, next) => {
     auth(req, res, () => {
-        if (req.user.id === req.user.id || req.user.isAdmin || req.user.isSeller || req.user.isUser) {
+        if (req.user && (req.user.isAdmin || req.user.isSeller || req.user.isUser || req.user.isBuilder || req.user.isMasonry)) {
             next();
         } else {
             res.status(403).json("You Are Not Authorized to Perform That Function")
@@ -40,32 +40,13 @@ const auth = async (req, res, next) => {
     if (authHeader) {
         const token = authHeader.split(" ")[1]
         jwt.verify(token, process.env.SECRET, (err, user) => {
-            if (err) res.status(403).json("Token is Not Valid!");
-            req.user = user
+            if (err) return res.status(403).json({ status: 403, message: 'Token is not valid.', error: true });
+            req.user = user;
             next();
-        })
+        });
     } else {
-        return res.status(401).json("You are not authenticated!");
+        return res.status(401).json({ status: 401, message: 'You are not authenticated.', error: true });
     }
-
-
-
-    /* if (req.headers.token == '') {
-        return res.status(401).send({ "status": 401, "message": "Token empty", "error": true });
-    }
-    try {
-        let decoded = await jwt.verify(req.headers['authorization'], process.env.SECRET);
-        console.log(decoded,"decoded");
-        console.log(app.get("data"),"app.get('data')");
-        if (app.get("data").uuid != decoded.uuid) {
-            return res.status(401).send({ "status": 401, "message": "Unauthorised token", "error": true });
-        }
-        next();
-    } catch (error) {
-        console.log(error.message);
-        return res.status(401).send({ "status": 401, "message": "Unauthorised token", "error": true });
-
-    } */
 }
 const sellerAuth = async (req, res, next) => {
     auth(req, res, () => {

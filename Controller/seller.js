@@ -47,6 +47,10 @@ const updateSeller = async (req, res, next) => {
         }
 
         let id = req.params.id;
+        // Ownership check — a seller can only update their own profile
+        if (req.user && req.user.id !== id) {
+            return res.status(403).json({ status: 403, message: 'Access denied: you can only update your own profile.', error: true });
+        }
         await Seller.updateOne({ _id: id }, req.body);
         const seller = await Seller.findOne({ _id: id });
         return res.send({ status: 200, data: seller, message: "Updated details for " + seller.id, error: false });
@@ -69,6 +73,10 @@ const allSellers = async (req, res, next) => {
 const deleteSeller = async (req, res, next) => {
     try {
         let id = req.params.id;
+        // Ownership check — a seller can only delete their own account
+        if (req.user && req.user.id !== id) {
+            return res.status(403).json({ status: 403, message: 'Access denied: you can only delete your own account.', error: true });
+        }
         const seller = await Seller.updateOne({ _id: id }, { is_delete: 1 });
         return res.send({ status: 200, data: seller, message: "Deleted details for " + id, error: false });
     } catch (error) {
