@@ -34,5 +34,6 @@ router.use('/inventory',        require("./inventory"));
 router.use('/wishlist',         require("./wishlist"));
 router.use('/timelines',          require("./project_timeline"));
 router.use('/prof-notifications',  require("./professional_notification"));
+router.use('/ai',                  require("./ai_assistant"));
 
 module.exports = router;
