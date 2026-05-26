@@ -5,7 +5,10 @@
  *  1. Rate limit  — 15 AI queries / user / day
  *  2. Exact cache — MongoDB stores Q&A pairs; same question = free answer
  *  3. Groq API    — free tier (llama-3.1-8b-instant, 14,400 req/day)
- *  4. Short prompts — system prompt <400 tokens, max 250 tokens output
+ *  4. Short prompts — system prompt <400 tokens, output capped at
+ *     280 tokens for English / 700 tokens for Indic scripts
+ *     (Telugu/Tamil/Kannada/Hindi/Devanagari etc. cost ~2–3× more tokens
+ *     per character, so we need a higher cap to avoid mid-sentence truncation).
  */
 
 const crypto  = require('crypto');
@@ -17,7 +20,26 @@ const AiUsage = require('../Model/AiUsage');
 const DAILY_LIMIT   = 15;   // free queries per user per day
 const GROQ_API_URL  = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL    = 'llama-3.1-8b-instant';   // fastest free model
-const MAX_TOKENS    = 280;                        // keep responses short = cheap
+const MAX_TOKENS_EN    = 280;   // English (and other Latin-script) — short & cheap
+const MAX_TOKENS_INDIC = 700;   // Indic scripts need ~2–3× more tokens for the same answer length
+
+// Detect any Indic script (Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil,
+// Telugu, Kannada, Malayalam) anywhere in the user's message. Used to size the
+// completion budget so we don't get cut off mid-sentence on long multilingual answers.
+const INDIC_SCRIPT_RE = new RegExp(
+    '[' +
+    '\u0900-\u097F' +   // Devanagari (Hindi/Marathi/Sanskrit)
+    '\u0980-\u09FF' +   // Bengali / Assamese
+    '\u0A00-\u0A7F' +   // Gurmukhi (Punjabi)
+    '\u0A80-\u0AFF' +   // Gujarati
+    '\u0B00-\u0B7F' +   // Oriya
+    '\u0B80-\u0BFF' +   // Tamil
+    '\u0C00-\u0C7F' +   // Telugu
+    '\u0C80-\u0CFF' +   // Kannada
+    '\u0D00-\u0D7F' +   // Malayalam
+    ']'
+);
+const hasIndicScript = (text) => INDIC_SCRIPT_RE.test(String(text || ''));
 
 // Rotating keys: add up to 3 free Groq keys in your .env to triple the free quota
 const GROQ_KEYS = [
@@ -406,13 +428,13 @@ async function checkAndIncrementUsage(userId) {
 }
 
 // ── Call Groq API ─────────────────────────────────────────────────────────────
-async function callGroq(messages) {
+async function callGroq(messages, maxTokens = MAX_TOKENS_EN) {
     const resp = await axios.post(
         GROQ_API_URL,
         {
             model:      GROQ_MODEL,
             messages,
-            max_tokens: MAX_TOKENS,
+            max_tokens: maxTokens,
             temperature: 0.4,   // lower = more factual for construction advice
         },
         {
@@ -498,9 +520,15 @@ exports.chat = async (req, res) => {
         ];
 
         // ── 5. Call Groq ──────────────────────────────────────────────────────
+        // Indic scripts (Telugu/Tamil/Kannada/Hindi/etc.) need ~2–3× more tokens
+        // for the same answer length, so we bump max_tokens for those messages
+        // to prevent mid-sentence truncation. Detection runs on the user's
+        // message only (not history) since that's the language they'll get back.
+        const maxTokens = hasIndicScript(cleanMsg) ? MAX_TOKENS_INDIC : MAX_TOKENS_EN;
+
         let answer;
         try {
-            answer = await callGroq(messages);
+            answer = await callGroq(messages, maxTokens);
         } catch (groqErr) {
             console.error('Groq API error:', groqErr?.response?.data || groqErr.message);
             // Groq unavailable — check if key is missing vs network error
