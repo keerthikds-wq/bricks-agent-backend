@@ -6,9 +6,10 @@
  *  2. Exact cache — MongoDB stores Q&A pairs; same question = free answer
  *  3. Groq API    — free tier (llama-3.1-8b-instant, 14,400 req/day)
  *  4. Short prompts — system prompt <400 tokens, output capped at
- *     280 tokens for English / 700 tokens for Indic scripts
- *     (Telugu/Tamil/Kannada/Hindi/Devanagari etc. cost ~2–3× more tokens
- *     per character, so we need a higher cap to avoid mid-sentence truncation).
+ *     280 tokens for English / 1100 tokens for Indic scripts
+ *     (Telugu/Tamil/Kannada/Hindi/Devanagari etc. cost ~4–5× more tokens
+ *     per character on llama-3.1-8b-instant; 1100 was the smallest cap that
+ *     consistently produced finish_reason=stop on multi-part questions).
  */
 
 const crypto  = require('crypto');
@@ -21,7 +22,9 @@ const DAILY_LIMIT   = 15;   // free queries per user per day
 const GROQ_API_URL  = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL    = 'llama-3.1-8b-instant';   // fastest free model
 const MAX_TOKENS_EN    = 280;   // English (and other Latin-script) — short & cheap
-const MAX_TOKENS_INDIC = 700;   // Indic scripts need ~2–3× more tokens for the same answer length
+const MAX_TOKENS_INDIC = 1100;  // Indic scripts cost ~4–5× more tokens per *character* on this model;
+                                // 1100 was empirically the smallest cap that lets the model finish a
+                                // multi-part Telugu/Tamil/Kannada/Hindi answer without finish_reason=length.
 
 // Detect any Indic script (Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil,
 // Telugu, Kannada, Malayalam) anywhere in the user's message. Used to size the
