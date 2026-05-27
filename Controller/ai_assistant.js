@@ -20,8 +20,8 @@ const AiUsage = require('../Model/AiUsage');
 const DAILY_LIMIT   = 15;   // free queries per user per day
 const GROQ_API_URL  = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL    = 'llama-3.1-8b-instant';   // fastest free model
-const MAX_TOKENS_EN    = 280;   // English (and other Latin-script) — short & cheap
-const MAX_TOKENS_INDIC = 700;   // Indic scripts need ~2–3× more tokens for the same answer length
+const MAX_TOKENS_EN    = 400;    // English — enough for a complete structured answer
+const MAX_TOKENS_INDIC = 1500;   // Telugu/Tamil/Kannada/Hindi Unicode needs 3–4 tokens/char
 
 // Detect any Indic script (Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil,
 // Telugu, Kannada, Malayalam) anywhere in the user's message. Used to size the
@@ -40,6 +40,15 @@ const INDIC_SCRIPT_RE = new RegExp(
     ']'
 );
 const hasIndicScript = (text) => INDIC_SCRIPT_RE.test(String(text || ''));
+
+// Detect Romanized Indian languages — Telugu/Hindi/Tamil written in English letters.
+// These are NOT caught by INDIC_SCRIPT_RE but still need the higher token budget
+// because the AI will reply in the script of the language (full Unicode).
+const ROMANIZED_INDIC_RE = /\b(antundu|antu|cheppandi|cheppу|vaddu|vadhu|mestri|lanti|okka|anni|chala|bayata|undi|ledu|ayindi|avutundi|cheyyali|cheyyadam|ikkade|akkade|emo|kaadu|aite|aithe|mari|mee|meeru|memu|mana|nenu|naku|meeru|bricks\s+vadhu|cement\s+anta|hai\s+kya|kaise|batao|chahiye|lagega|kitna|kitne|karna|karein|karenge|thik|theek|agar|yaha|wahan|matlab|samajh|accha|theek\s+hai)\b/i;
+const needsIndicTokens = (text) => hasIndicScript(text) || ROMANIZED_INDIC_RE.test(String(text || ''));
+
+// Keywords that mean the user wants to continue the previous answer
+const CONTINUATION_RE = /^(continue|go on|tell me more|more|next|aur\s*batao|aage\s*batao|ముందు\s*చెప్పు|కొనసాగించు|ಮುಂದುವರೆಸು|தொடரவும்|आगे\s*बताओ|jari\s*rakho)\.?$/i;
 
 // Rotating keys: add up to 3 free Groq keys in your .env to triple the free quota
 const GROQ_KEYS = [
@@ -61,20 +70,31 @@ const SYSTEM_PROMPT = `You are Bricks AI — a practical construction assistant 
 
 Expertise: material quantities, construction advice, waterproofing, foundation, plastering, tiling, pricing guidance, and Bricks app usage.
 
-Rules:
-- ALWAYS reply in the SAME language the user writes in (Telugu, Kannada, Tamil, Hindi, or English)
-- Keep answers under 150 words — practical and direct
-- For quantities: use standard Indian ratios (1:2:4 mix, thumb rules per sqft/cum)
-- For prices: say "prices vary by region/season" and give a general INR range
-- For app help: guide them through the Bricks app features (post requirements, find sellers, BOQ, RFQ, etc.)
-- Never recommend competitors or external platforms
-- If unsure, say "consult a local engineer" rather than guessing
+CRITICAL LANGUAGE RULE:
+- Detect the language the user is writing in — even if they write Telugu/Hindi/Tamil using English letters (e.g. "mestri", "antundu", "vadhu", "kaise", "batao")
+- If the user writes in Telugu letters OR Romanized Telugu → reply fully in Telugu script
+- If the user writes in Hindi/Hinglish → reply in Hindi (Devanagari)
+- If the user writes in Tamil → reply in Tamil script
+- If the user writes in Kannada → reply in Kannada script
+- If the user writes in English → reply in English
+- NEVER mix languages mid-sentence
 
-Indian construction knowledge you must know:
-- 1 sqft wall (4.5 inch) needs ~8 bricks and 0.4 bags cement
-- M20 concrete: 1:1.5:3 (cement:sand:aggregate), needs 8 bags/cum
-- 1 sqft floor tiling needs ~1.1 sqft tiles (10% wastage)
-- Thumb rule: 1 bag cement = 50 kg, covers ~3 sqft plaster (12mm thick)`;
+ANSWER RULES:
+- ALWAYS give a COMPLETE answer — never stop mid-sentence
+- Use bullet points (•) for lists — easier to read on mobile
+- For quantities: use Indian thumb rules (sqft, bags, kg)
+- For prices: give an INR range and note "prices vary by region"
+- For app help: guide them through Bricks app features (post requirements, BOQ, RFQ, find sellers)
+- If unsure: say "consult a local engineer" — never guess structural advice
+- Never recommend competitors or external platforms
+
+Indian construction knowledge:
+- 4.5" wall: ~8 bricks + 0.4 bags cement per sqft
+- M20 concrete: 1:1.5:3 ratio, 8 bags/cum
+- Floor tiling: order 10% extra (wastage)
+- Cement plaster 12mm: 1 bag covers ~3 sqft
+- Red clay bricks: traditional, good insulation, used across India
+- Cement/AAC blocks: lighter, faster, good for Tier-2/3 cities like Tirupati`;
 
 // ── Static FAQ — 100 entries, 5 languages, zero API cost ─────────────────────
 const STATIC_FAQ = [
@@ -427,25 +447,28 @@ async function checkAndIncrementUsage(userId) {
     return usage.count;
 }
 
-// ── Call Groq API ─────────────────────────────────────────────────────────────
+// ── Call Groq API — returns { answer, truncated } ────────────────────────────
 async function callGroq(messages, maxTokens = MAX_TOKENS_EN) {
     const resp = await axios.post(
         GROQ_API_URL,
         {
-            model:      GROQ_MODEL,
+            model:       GROQ_MODEL,
             messages,
-            max_tokens: maxTokens,
-            temperature: 0.4,   // lower = more factual for construction advice
+            max_tokens:  maxTokens,
+            temperature: 0.4,
         },
         {
             headers: {
                 'Authorization': `Bearer ${getKey()}`,
                 'Content-Type':  'application/json',
             },
-            timeout: 15000,
+            timeout: 20000,
         }
     );
-    return resp.data.choices[0].message.content.trim();
+    const choice       = resp.data.choices[0];
+    const answer       = choice.message.content.trim();
+    const truncated    = choice.finish_reason === 'length';
+    return { answer, truncated };
 }
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
@@ -474,7 +497,44 @@ exports.chat = async (req, res) => {
             });
         }
 
-        // ── 2. Cache lookup ───────────────────────────────────────────────────
+        // ── 2. Continuation check — bypass cache, use conversation context ───
+        const isContinuation = CONTINUATION_RE.test(cleanMsg);
+        if (isContinuation) {
+            if (!history || history.length === 0) {
+                return res.json({
+                    error: false,
+                    answer: 'Please ask your question first, then I can continue!',
+                    cached: false, usage: usageCount, limit: DAILY_LIMIT,
+                    remaining: Math.max(0, DAILY_LIMIT - usageCount),
+                });
+            }
+            const recentHist = history.slice(-6).map(h => ({
+                role:    h.role === 'user' ? 'user' : 'assistant',
+                content: String(h.content).slice(0, 400),
+            }));
+            const contMsgs = [
+                { role: 'system', content: SYSTEM_PROMPT },
+                ...recentHist,
+                { role: 'user', content: 'Please continue from exactly where you stopped. Complete the answer without repeating what you already said.' },
+            ];
+            const lastUserMsg = [...recentHist].reverse().find(h => h.role === 'user');
+            const contMaxTok  = lastUserMsg && needsIndicTokens(lastUserMsg.content)
+                ? MAX_TOKENS_INDIC : MAX_TOKENS_EN;
+            let contResult;
+            try {
+                contResult = await callGroq(contMsgs, contMaxTok);
+            } catch (e) {
+                console.error('Groq continuation error:', e?.response?.data || e.message);
+                return res.status(503).json({ error: true, message: 'AI service temporarily unavailable.' });
+            }
+            return res.json({
+                error: false, answer: contResult.answer, truncated: contResult.truncated,
+                cached: false, usage: usageCount, limit: DAILY_LIMIT,
+                remaining: Math.max(0, DAILY_LIMIT - usageCount),
+            });
+        }
+
+        // ── 3. Cache lookup ───────────────────────────────────────────────────
         const qHash = hashQuestion(cleanMsg);
         const cached = await AiCache.findOneAndUpdate(
             { question_hash: qHash },
@@ -493,7 +553,7 @@ exports.chat = async (req, res) => {
             });
         }
 
-        // ── 3. Static FAQ check (zero API cost) ─────────────────────────────────
+        // ── 4. Static FAQ check (zero API cost) ─────────────────────────────────
         const staticAnswer = findStaticAnswer(cleanMsg);
         if (staticAnswer) {
             // Cache it too for future hash-based hits
@@ -506,7 +566,7 @@ exports.chat = async (req, res) => {
             });
         }
 
-        // ── 4. Build message array for Groq ───────────────────────────────────
+        // ── 5. Build message array for Groq ───────────────────────────────────
         // Keep last 3 exchanges max (6 messages) for context — saves tokens
         const recentHistory = (history || []).slice(-6).map(h => ({
             role:    h.role === 'user' ? 'user' : 'assistant',
@@ -519,19 +579,17 @@ exports.chat = async (req, res) => {
             { role: 'user',   content: cleanMsg },
         ];
 
-        // ── 5. Call Groq ──────────────────────────────────────────────────────
-        // Indic scripts (Telugu/Tamil/Kannada/Hindi/etc.) need ~2–3× more tokens
-        // for the same answer length, so we bump max_tokens for those messages
-        // to prevent mid-sentence truncation. Detection runs on the user's
-        // message only (not history) since that's the language they'll get back.
-        const maxTokens = hasIndicScript(cleanMsg) ? MAX_TOKENS_INDIC : MAX_TOKENS_EN;
+        // ── 6. Call Groq ──────────────────────────────────────────────────────
+        // needsIndicTokens catches both Unicode Indic scripts AND Romanized Telugu/Hindi
+        // (e.g. "mestri antundu" written in English letters). The AI will reply in full
+        // Unicode which costs 3–4 tokens/char, so we give it a bigger budget.
+        const maxTokens = needsIndicTokens(cleanMsg) ? MAX_TOKENS_INDIC : MAX_TOKENS_EN;
 
-        let answer;
+        let groqResult;
         try {
-            answer = await callGroq(messages, maxTokens);
+            groqResult = await callGroq(messages, maxTokens);
         } catch (groqErr) {
             console.error('Groq API error:', groqErr?.response?.data || groqErr.message);
-            // Groq unavailable — check if key is missing vs network error
             const keyMissing = !process.env.GROQ_API_KEY;
             return res.status(503).json({
                 error:   true,
@@ -541,16 +599,21 @@ exports.chat = async (req, res) => {
             });
         }
 
-        // ── 6. Cache the new answer ───────────────────────────────────────────
-        AiCache.create({
-            question_hash: qHash,
-            question_text: cleanMsg,
-            answer_text:   answer,
-        }).catch(() => {});  // non-blocking, non-fatal
+        // ── 7. Cache only COMPLETE answers (not truncated ones) ───────────────
+        // finish_reason === 'length' means Groq cut the answer short — caching
+        // a broken answer would serve it forever from cache. Skip caching it.
+        if (!groqResult.truncated) {
+            AiCache.create({
+                question_hash: qHash,
+                question_text: cleanMsg,
+                answer_text:   groqResult.answer,
+            }).catch(() => {});
+        }
 
         return res.json({
             error:     false,
-            answer,
+            answer:    groqResult.answer,
+            truncated: groqResult.truncated,   // Flutter uses this to show/hide Continue button
             cached:    false,
             usage:     usageCount,
             limit:     DAILY_LIMIT,
