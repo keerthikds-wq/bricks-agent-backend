@@ -9,9 +9,10 @@
  *   garden    — Garden / landscape design
  *
  * AI Providers (configure via .env):
- *   REPLICATE_API_TOKEN   — Replicate.com (primary, async, URL-based)
- *   STABILITY_API_KEY     — Stability AI (secondary, sync, higher quality)
- *   DESIGN_AI_PROVIDER    — 'replicate' | 'stability' | 'mock'  (default: replicate)
+ *   RUNWARE_API_KEY       — Runware.ai (recommended — ~$0.002/img, sub-second, FLUX Redux img2img)
+ *   REPLICATE_API_TOKEN   — Replicate.com (async, broader model ecosystem)
+ *   STABILITY_API_KEY     — Stability AI (sync, high quality)
+ *   DESIGN_AI_PROVIDER    — 'runware' | 'replicate' | 'stability' | 'mock'  (default: replicate)
  *
  * Flow:
  *   1. App uploads image → POST /api/design-gen/upload-image → Cloudinary URL
@@ -426,6 +427,65 @@ async function pollReplicatePrediction(predictionId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// RUNWARE AI HELPER (sync REST, FLUX Redux img2img — recommended)
+// Model: runware:105@1 = FLUX Redux (image restyling / variation)
+// Cost: ~$0.002/image | Speed: sub-second | Auth: Bearer token
+// NOTE: FLUX strength must be ≥ 0.80 for visible changes. Values below 0.8
+//       have near-zero effect on the output image in FLUX architecture.
+// ══════════════════════════════════════════════════════════════════════════════
+async function generateWithRunware(imageUrl, prompt, negativePrompt, strength) {
+    const apiKey = process.env.RUNWARE_API_KEY;
+    if (!apiKey) throw new Error('RUNWARE_API_KEY not configured');
+
+    // Download source image and encode as base64 data URI
+    const imgResp    = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 20000 });
+    const b64        = Buffer.from(imgResp.data).toString('base64');
+    const mimeType   = imgResp.headers['content-type']?.split(';')[0] || 'image/webp';
+    const seedImage  = `data:${mimeType};base64,${b64}`;
+
+    // FLUX Redux: clamp strength to valid range (0.80–0.97)
+    const fluxStrength = Math.min(Math.max(strength || 0.75, 0.82), 0.97);
+
+    const taskUUID = crypto.randomUUID();
+
+    const resp = await axios.post(
+        'https://api.runware.ai/v1',
+        [
+            {
+                taskType:       'imageInference',
+                taskUUID,
+                model:          'runware:105@1',   // FLUX Redux — best for room/style restyling
+                positivePrompt: prompt,
+                negativePrompt: negativePrompt || 'low quality, blurry, cartoon, watermark, deformed',
+                seedImage,
+                strength:       fluxStrength,
+                width:          1024,
+                height:         1024,
+                numberResults:  1,
+                steps:          28,
+                CFGScale:       3.5,
+                outputFormat:   'WEBP',
+            },
+        ],
+        {
+            headers: {
+                Authorization:  `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            timeout: 60000,
+        }
+    );
+
+    const data = resp.data?.data;
+    if (!data || !data.length) throw new Error('Runware: empty response');
+
+    const result = data.find(d => d.taskType === 'imageInference' && d.imageURL);
+    if (!result) throw new Error('Runware: no imageInference result — ' + JSON.stringify(data));
+
+    return result.imageURL;   // direct HTTPS URL to the generated WEBP
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // STABILITY AI HELPER (sync, returns image buffer)
 // ══════════════════════════════════════════════════════════════════════════════
 async function generateWithStability(imageUrl, prompt, negativePrompt, strength) {
@@ -499,7 +559,13 @@ async function runGeneration(record) {
         let outputUrl;
         const provider = PROVIDER;
 
-        if (provider === 'stability') {
+        if (provider === 'runware') {
+            // Sync REST: generate via FLUX Redux → mirror to Cloudinary
+            const runwareUrl = await generateWithRunware(imageUrl, prompt, negative_prompt, strength);
+            const upload = await uploadUrlToCloudinary(runwareUrl);
+            outputUrl = upload.secure_url;
+
+        } else if (provider === 'stability') {
             // Sync: generate → upload → done
             const buffer = await generateWithStability(imageUrl, prompt, negative_prompt, strength);
             const upload = await uploadBufferToCloudinary(buffer);

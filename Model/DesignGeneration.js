@@ -32,7 +32,7 @@ const DesignGenerationSchema = new Schema({
     output_images:          [OutputImageSchema],
 
     // ── AI job tracking ──────────────────────────────────────────────────────
-    provider: { type: String, enum: ['replicate', 'stability', 'mock'], default: 'replicate' },
+    provider: { type: String, enum: ['runware', 'replicate', 'stability', 'mock'], default: 'replicate' },
     job_id:   { type: String },   // external prediction / request ID
     prompt:   { type: String },   // prompt used (for debugging)
     status: {
