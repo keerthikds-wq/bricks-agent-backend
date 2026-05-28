@@ -35,5 +35,7 @@ router.use('/wishlist',         require("./wishlist"));
 router.use('/timelines',          require("./project_timeline"));
 router.use('/prof-notifications',  require("./professional_notification"));
 router.use('/ai',                  require("./ai_assistant"));
+router.use('/home-design',         require("./home_design"));
+router.use('/design-gen',          require("./design_generation"));
 
 module.exports = router;
