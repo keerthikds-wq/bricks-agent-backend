@@ -427,23 +427,32 @@ async function pollReplicatePrediction(predictionId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// RUNWARE AI HELPER (sync REST, FLUX Redux img2img — recommended)
-// Model: runware:105@1 = FLUX Redux (image restyling / variation)
-// Cost: ~$0.002/image | Speed: sub-second | Auth: Bearer token
-// NOTE: FLUX strength must be ≥ 0.80 for visible changes. Values below 0.8
-//       have near-zero effect on the output image in FLUX architecture.
+// RUNWARE AI HELPER (sync REST, FLUX.2 [klein] 9B img2img — recommended)
+//
+// Model: bfl:flux-2-klein-9b@1 — FLUX.2 [klein] 9B by Black Forest Labs
+//   • 4-step distilled → sub-second generation (steps MUST be 4 for distilled)
+//   • Unified text-to-image + image editing in one model
+//   • Cost: ~$0.002/image | Auth: Bearer token
+//
+// FLUX strength note: values below 0.80 have near-zero visual effect in FLUX
+//   architecture. Strength is clamped to [0.82, 0.97].
+//
+// Model ID is configurable via RUNWARE_MODEL env var — verify the exact AIR
+// string from your Runware dashboard (runware.ai/models/bfl-flux-2-klein-9b).
 // ══════════════════════════════════════════════════════════════════════════════
+const RUNWARE_MODEL = process.env.RUNWARE_MODEL || 'bfl:flux-2-klein-9b@1';
+
 async function generateWithRunware(imageUrl, prompt, negativePrompt, strength) {
     const apiKey = process.env.RUNWARE_API_KEY;
     if (!apiKey) throw new Error('RUNWARE_API_KEY not configured');
 
     // Download source image and encode as base64 data URI
-    const imgResp    = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 20000 });
-    const b64        = Buffer.from(imgResp.data).toString('base64');
-    const mimeType   = imgResp.headers['content-type']?.split(';')[0] || 'image/webp';
-    const seedImage  = `data:${mimeType};base64,${b64}`;
+    const imgResp   = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 20000 });
+    const b64       = Buffer.from(imgResp.data).toString('base64');
+    const mimeType  = imgResp.headers['content-type']?.split(';')[0] || 'image/jpeg';
+    const seedImage = `data:${mimeType};base64,${b64}`;
 
-    // FLUX Redux: clamp strength to valid range (0.80–0.97)
+    // FLUX.2 Klein strength must be ≥ 0.80 for visible edits
     const fluxStrength = Math.min(Math.max(strength || 0.75, 0.82), 0.97);
 
     const taskUUID = crypto.randomUUID();
@@ -454,7 +463,7 @@ async function generateWithRunware(imageUrl, prompt, negativePrompt, strength) {
             {
                 taskType:       'imageInference',
                 taskUUID,
-                model:          'runware:105@1',   // FLUX Redux — best for room/style restyling
+                model:          RUNWARE_MODEL,
                 positivePrompt: prompt,
                 negativePrompt: negativePrompt || 'low quality, blurry, cartoon, watermark, deformed',
                 seedImage,
@@ -462,7 +471,7 @@ async function generateWithRunware(imageUrl, prompt, negativePrompt, strength) {
                 width:          1024,
                 height:         1024,
                 numberResults:  1,
-                steps:          28,
+                steps:          4,          // distilled 4-step model — do NOT increase
                 CFGScale:       3.5,
                 outputFormat:   'WEBP',
             },
@@ -472,7 +481,7 @@ async function generateWithRunware(imageUrl, prompt, negativePrompt, strength) {
                 Authorization:  `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
-            timeout: 60000,
+            timeout: 30000,   // sub-second model; 30s is generous
         }
     );
 
