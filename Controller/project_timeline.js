@@ -1,14 +1,24 @@
 const ProjectTimeline = require("../Model/ProjectTimeline");
 
+// Resolve caller's _id from whichever auth middleware ran.
+// verifyTokenwithAuthorization → req.user
+// builderAuth (legacy)         → req.builder
+// masonryAuth (legacy)         → req.masonry
+const _callerId = (req) =>
+  (req.user && req.user._id) ||
+  (req.builder && req.builder._id) ||
+  (req.masonry && req.masonry._id);
+
 // POST /api/timelines
 exports.createProject = async (req, res) => {
   try {
+    const userId = _callerId(req);
     const { project_name, location, project_type, status, start_date, end_date, total_sqft, description } = req.body;
     if (!project_name) {
       return res.status(400).json({ success: false, message: "project_name is required" });
     }
     const project = await ProjectTimeline.create({
-      builder_id: req.builder._id,
+      builder_id: userId,   // field name kept for DB compatibility
       project_name,
       location,
       project_type,
@@ -28,11 +38,12 @@ exports.createProject = async (req, res) => {
 // PUT /api/timelines/:id
 exports.updateProject = async (req, res) => {
   try {
+    const userId = _callerId(req);
     const project = await ProjectTimeline.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ success: false, message: "Project not found" });
     }
-    if (project.builder_id.toString() !== req.builder._id.toString()) {
+    if (project.builder_id.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
     const allowed = ["project_name", "location", "project_type", "status", "start_date", "end_date", "total_sqft", "description"];
@@ -55,11 +66,12 @@ exports.updateProject = async (req, res) => {
 // DELETE /api/timelines/:id
 exports.deleteProject = async (req, res) => {
   try {
+    const userId = _callerId(req);
     const project = await ProjectTimeline.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ success: false, message: "Project not found" });
     }
-    if (project.builder_id.toString() !== req.builder._id.toString()) {
+    if (project.builder_id.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
     await ProjectTimeline.findByIdAndDelete(req.params.id);
@@ -73,11 +85,12 @@ exports.deleteProject = async (req, res) => {
 // PUT /api/timelines/:id/phase/:phase_index
 exports.updatePhase = async (req, res) => {
   try {
+    const userId = _callerId(req);
     const project = await ProjectTimeline.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ success: false, message: "Project not found" });
     }
-    if (project.builder_id.toString() !== req.builder._id.toString()) {
+    if (project.builder_id.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
     const index = parseInt(req.params.phase_index, 10);
@@ -110,7 +123,8 @@ exports.updatePhase = async (req, res) => {
 // GET /api/timelines/my
 exports.getMyProjects = async (req, res) => {
   try {
-    const projects = await ProjectTimeline.find({ builder_id: req.builder._id })
+    const userId = _callerId(req);
+    const projects = await ProjectTimeline.find({ builder_id: userId })
       .sort({ createdAt: -1 });
     return res.status(200).json({ success: true, data: projects });
   } catch (err) {
