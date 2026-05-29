@@ -1,11 +1,11 @@
 const ProjectTimeline = require("../Model/ProjectTimeline");
 
 // Resolve caller's _id from whichever auth middleware ran.
-// verifyTokenwithAuthorization → req.user
-// builderAuth (legacy)         → req.builder
-// masonryAuth (legacy)         → req.masonry
+// verifyTokenwithAuthorization / Auth → req.user  (JWT payload uses .id, not ._id)
+// builderAuth (legacy)               → req.builder
+// masonryAuth (legacy)               → req.masonry
 const _callerId = (req) =>
-  (req.user && req.user._id) ||
+  (req.user  && (req.user.id  || req.user._id))  ||
   (req.builder && req.builder._id) ||
   (req.masonry && req.masonry._id);
 
