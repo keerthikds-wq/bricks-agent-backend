@@ -1,5 +1,9 @@
 const Inventory = require('../Model/Inventory');
 
+// JWT payloads are signed with { id: seller._id } so decoded tokens expose
+// req.user.id, not _uid(req).  Use this helper everywhere.
+const _uid = (req) => req.user.id || _uid(req);
+
 // ── POST /api/inventory  — add a new item ─────────────────────────────────────
 exports.addItem = async (req, res) => {
   try {
@@ -10,7 +14,7 @@ exports.addItem = async (req, res) => {
     }
 
     const item = await Inventory.create({
-      seller_id:      req.user._id,
+      seller_id:      _uid(req),
       name:           name.trim(),
       category,
       quantity:       Number(quantity),
@@ -32,7 +36,7 @@ exports.updateItem = async (req, res) => {
     const item = await Inventory.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found.' });
 
-    if (String(item.seller_id) !== String(req.user._id)) {
+    if (String(item.seller_id) !== String(_uid(req))) {
       return res.status(403).json({ message: 'Not authorised to update this item.' });
     }
 
@@ -59,7 +63,7 @@ exports.deleteItem = async (req, res) => {
     const item = await Inventory.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found.' });
 
-    if (String(item.seller_id) !== String(req.user._id)) {
+    if (String(item.seller_id) !== String(_uid(req))) {
       return res.status(403).json({ message: 'Not authorised to delete this item.' });
     }
 
@@ -76,7 +80,7 @@ exports.toggleAvailability = async (req, res) => {
     const item = await Inventory.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found.' });
 
-    if (String(item.seller_id) !== String(req.user._id)) {
+    if (String(item.seller_id) !== String(_uid(req))) {
       return res.status(403).json({ message: 'Not authorised to update this item.' });
     }
 
@@ -91,7 +95,7 @@ exports.toggleAvailability = async (req, res) => {
 // ── GET /api/inventory/my  — all items for logged-in seller ──────────────────
 exports.getMyInventory = async (req, res) => {
   try {
-    const items = await Inventory.find({ seller_id: req.user._id })
+    const items = await Inventory.find({ seller_id: _uid(req) })
       .sort({ category: 1, name: 1 })
       .lean();
 
