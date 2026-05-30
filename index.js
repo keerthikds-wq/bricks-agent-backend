@@ -65,12 +65,16 @@ connect().then(async () => {
 app.use('/api', require('./Routes/index'));
 
 app.get('/', (req, res) => {
-    res.status(200).json({
-        name: 'Bricks Agent API',
-        version: '2.0.0',
-        status: 'running',
-        timestamp: new Date().toISOString(),
-    });
+    const accept = req.headers['accept'] || '';
+    if (accept.includes('application/json') || req.query.format === 'json') {
+        return res.status(200).json({
+            name: 'Bricks Agent API',
+            version: '2.0.0',
+            status: 'running',
+            timestamp: new Date().toISOString(),
+        });
+    }
+    res.sendFile(require('path').join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/health', (req, res) => {

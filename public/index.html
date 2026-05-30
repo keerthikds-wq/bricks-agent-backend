@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bricks Agent — AI-Powered Construction Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:        #C9922A;
+      --gold-light:  #E8B84B;
+      --gold-dim:    rgba(201,146,42,0.12);
+      --gold-border: rgba(201,146,42,0.18);
+      --orange:      #E86420;
+      --bg:          #07090F;
+      --surface:     #0F1320;
+      --surface-2:   #151C2E;
+      --text-1:      #F0F2F8;
+      --text-2:      #8A95A8;
+      --text-3:      #454E60;
+      --radius:      14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text-1);
+      font-family: 'Inter', system-ui, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid texture ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(201,146,42,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201,146,42,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Glow orbs ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(201,146,42,0.08) 0%, transparent 70%); top: -200px; right: -200px; }
+    .orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(232,100,32,0.06) 0%, transparent 70%); bottom: -150px; left: -150px; animation-delay: -9s; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(30px, 20px) scale(1.05); }
+    }
+
+    /* ── Layout ── */
+    .page { position: relative; z-index: 1; }
+
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      height: 68px;
+      background: rgba(7,9,15,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--gold-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2px;
+      width: 26px;
+      height: 18px;
+    }
+    .brick { border-radius: 2px; background: var(--gold); }
+    .brick:nth-child(1) { grid-column: span 2; background: var(--gold-light); }
+    .brick:nth-child(4) { grid-column: span 1; background: var(--gold-light); }
+    .brick:nth-child(5) { grid-column: span 2; }
+
+    .brand-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .brand-name .bricks { color: #FFFFFF; }
+    .brand-name .agent  { color: var(--gold); }
+
+    .nav-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-2);
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #22C55E;
+      animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+      50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+    }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-border);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold-light);
+      margin-bottom: 32px;
+    }
+
+    .hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(48px, 8vw, 88px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+    }
+
+    .hero-title .line-1 { color: #FFFFFF; display: block; }
+    .hero-title .line-2 {
+      display: block;
+      background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 50%, var(--orange) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-desc {
+      font-size: 18px;
+      color: var(--text-2);
+      max-width: 560px;
+      margin: 0 auto 48px;
+      line-height: 1.75;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 80px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+      color: #0A0B0F;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 14px 32px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      letter-spacing: 0.5px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 24px rgba(201,146,42,0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 36px rgba(201,146,42,0.45);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-1);
+      font-weight: 500;
+      font-size: 14px;
+      padding: 13px 30px;
+      border-radius: 10px;
+      border: 1px solid rgba(240,242,248,0.12);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: var(--gold-border);
+      background: var(--gold-dim);
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--gold-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .stat-item {
+      flex: 1;
+      padding: 20px 28px;
+      text-align: center;
+      border-right: 1px solid var(--gold-border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gold-light);
+      font-family: 'Space Grotesk', sans-serif;
+      display: block;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ── Sections ── */
+    section {
+      padding: 100px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+    }
+
+    .section-desc {
+      font-size: 16px;
+      color: var(--text-2);
+      max-width: 560px;
+      line-height: 1.75;
+    }
+
+    /* ── Feature grid ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 60px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--gold-border);
+      border-radius: var(--radius);
+      padding: 32px;
+      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--gold), var(--orange));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .feature-card:hover {
+      border-color: rgba(201,146,42,0.35);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text-1);
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--text-2);
+      line-height: 1.7;
+    }
+
+    /* ── Endpoints ── */
+    .endpoints-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 48px;
+    }
+
+    .endpoint-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+    .endpoint-chip:hover { border-color: var(--gold-border); }
+
+    .method {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .method.get    { background: rgba(34,197,94,0.12);  color: #4ADE80; }
+    .method.post   { background: rgba(59,130,246,0.12); color: #60A5FA; }
+    .method.put    { background: rgba(245,158,11,0.12); color: #FCD34D; }
+    .method.delete { background: rgba(239,68,68,0.12);  color: #F87171; }
+
+    .endpoint-path {
+      color: var(--text-2);
+      font-family: 'Space Grotesk', monospace;
+      font-size: 12px;
+    }
+
+    /* ── Color palette showcase ── */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .palette-card {
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--gold-border);
+      background: var(--surface);
+    }
+
+    .palette-swatch {
+      height: 80px;
+    }
+
+    .palette-info {
+      padding: 14px 16px;
+    }
+
+    .palette-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 6px;
+    }
+
+    .palette-dots {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .color-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .color-dot:hover { transform: scale(1.3); }
+
+    /* ── Version banner ── */
+    .version-banner {
+      background: linear-gradient(135deg, var(--surface) 0%, #0D1628 100%);
+      border: 1px solid var(--gold-border);
+      border-radius: var(--radius);
+      padding: 40px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-top: 60px;
+    }
+
+    .version-info h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .version-info p { font-size: 14px; color: var(--text-2); }
+
+    .version-badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-green  { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.25);  color: #4ADE80; }
+    .badge-gold   { background: rgba(201,146,42,0.1); border: 1px solid rgba(201,146,42,0.25); color: var(--gold-light); }
+    .badge-blue   { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25); color: #A5B4FC; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--text-3);
+    }
+
+    footer .footer-brand {
+      font-weight: 600;
+      color: var(--gold);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      nav { padding: 0 20px; }
+      .hero { padding: 100px 20px 60px; }
+      .stats-bar { flex-direction: column; }
+      .stat-item { border-right: none; border-bottom: 1px solid var(--gold-border); }
+      .stat-item:last-child { border-bottom: none; }
+      .version-banner { flex-direction: column; }
+      .feature-card { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <!-- ── NAV ── -->
+  <nav>
+    <a class="brand" href="#">
+      <div class="brand-icon">
+        <div class="brick"></div>
+        <div class="brick"></div>
+        <div class="brick"></div>
+        <div class="brick"></div>
+        <div class="brick"></div>
+        <div class="brick"></div>
+      </div>
+      <div class="brand-name">
+        <span class="bricks">Bricks</span><span class="agent"> Agent</span>
+      </div>
+    </a>
+    <div class="nav-status">
+      <div class="status-dot"></div>
+      API v2.0 — All systems operational
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <!-- ── HERO ── -->
+    <section class="hero">
+      <div class="hero-eyebrow">
+        ✦ AI-Powered Construction Intelligence
+      </div>
+      <h1 class="hero-title">
+        <span class="line-1">Build Smarter.</span>
+        <span class="line-2">Design Bolder.</span>
+      </h1>
+      <p class="hero-desc">
+        Bricks Agent is India's premier AI platform for construction estimation, home design,
+        material intelligence, and end-to-end project management.
+      </p>
+      <div class="hero-actions">
+        <a href="/api/health" class="btn-primary">Check API Status</a>
+        <a href="#features" class="btn-secondary">Explore Features →</a>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <span class="stat-value">35+</span>
+          <span class="stat-label">API Endpoints</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">23</span>
+          <span class="stat-label">Design Styles</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">8</span>
+          <span class="stat-label">Indian Style Palettes</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">AI</span>
+          <span class="stat-label">Groq + Replicate</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FEATURES ── -->
+    <section id="features">
+      <p class="section-label">Core Platform</p>
+      <h2 class="section-title">Everything a construction<br/>project needs.</h2>
+      <p class="section-desc">
+        From AI-generated interior renders to real-time material pricing —
+        Bricks Agent covers every layer of the build lifecycle.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🏗️</div>
+          <div class="feature-title">BOQ Estimation</div>
+          <div class="feature-desc">
+            AI-powered Bill of Quantities with real-time material pricing, automatic
+            area calculations, and cost breakdowns by category.
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-title">Interior Design Generation</div>
+          <div class="feature-desc">
+            Generate photorealistic room renders from text prompts. Supports 23 unique
+            styles including Traditional Indian, Rajasthani Haveli, Scandinavian, and more.
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧱</div>
+          <div class="feature-title">Material Intelligence</div>
+          <div class="feature-desc">
+            Smart product catalog with 47+ material categories — structural, finishing,
+            plumbing, electrical, doors & windows — with brand-level specifications.
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <div class="feature-title">Price Trend Analytics</div>
+          <div class="feature-desc">
+            Track construction material prices over time. Auto-seeded trending data with
+            market signals for informed procurement decisions.
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤝</div>
+          <div class="feature-title">RFQ & Bidding</div>
+          <div class="feature-desc">
+            End-to-end Request for Quotation workflows connecting buyers with verified
+            sellers, builders, and masonry contractors.
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤖</div>
+          <div class="feature-title">AI Assistant</div>
+          <div class="feature-desc">
+            Powered by Groq's LLM, the Bricks AI Assistant answers construction queries,
+            provides material guidance, and assists with project planning in real time.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── DESIGN PALETTES ── -->
+    <section>
+      <p class="section-label">Design System</p>
+      <h2 class="section-title">Curated Indian &amp; International<br/>colour palettes.</h2>
+      <p class="section-desc">
+        Eight hand-crafted Indian design style palettes, each with primary, accent,
+        and neutral colours validated against real paint collections.
+      </p>
+
+      <div class="palette-grid">
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #F5F5F0, #2C2C2C 70%, #4A90D9);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Modern Contemporary</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#F5F5F0;" title="#F5F5F0"></div>
+              <div class="color-dot" style="background:#E8E0D5;" title="#E8E0D5"></div>
+              <div class="color-dot" style="background:#2C2C2C;" title="#2C2C2C"></div>
+              <div class="color-dot" style="background:#4A90D9;" title="#4A90D9"></div>
+              <div class="color-dot" style="background:#E67E22;" title="#E67E22"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #8B4513, #DAA520 50%, #6B2737);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Traditional Indian</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#8B4513;" title="#8B4513"></div>
+              <div class="color-dot" style="background:#DAA520;" title="#DAA520"></div>
+              <div class="color-dot" style="background:#6B2737;" title="#6B2737"></div>
+              <div class="color-dot" style="background:#FF6B35;" title="#FF6B35"></div>
+              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #5C3317, #B8860B 50%, #8B0000);"></div>
+          <div class="palette-info">
+            <div class="palette-name">South Indian Classical</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#5C3317;" title="#5C3317"></div>
+              <div class="color-dot" style="background:#B8860B;" title="#B8860B"></div>
+              <div class="color-dot" style="background:#8B0000;" title="#8B0000"></div>
+              <div class="color-dot" style="background:#FF4500;" title="#FF4500"></div>
+              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #2C1810, #8B7355 50%, #556B2F);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Kerala Nalukettu</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#2C1810;" title="#2C1810"></div>
+              <div class="color-dot" style="background:#8B7355;" title="#8B7355"></div>
+              <div class="color-dot" style="background:#556B2F;" title="#556B2F"></div>
+              <div class="color-dot" style="background:#DC143C;" title="#DC143C"></div>
+              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #CC0000, #FF8C00 50%, #FFD700);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Rajasthani Haveli</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#CC0000;" title="#CC0000"></div>
+              <div class="color-dot" style="background:#FF8C00;" title="#FF8C00"></div>
+              <div class="color-dot" style="background:#006400;" title="#006400"></div>
+              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
+              <div class="color-dot" style="background:#9932CC;" title="#9932CC"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #FFFFFF, #4CAF50 50%, #2196F3);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Vastu-Compliant Modern</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#F5F5F0;" title="#F5F5F0"></div>
+              <div class="color-dot" style="background:#4A3728;" title="#4A3728"></div>
+              <div class="color-dot" style="background:#FF6B2B;" title="#FF6B2B"></div>
+              <div class="color-dot" style="background:#4CAF50;" title="#4CAF50"></div>
+              <div class="color-dot" style="background:#2196F3;" title="#2196F3"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #FFFFFF, #2B2B2B 50%, #E74C3C);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Urban Contemporary</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#FFFFFF; border:1px solid #333;" title="#FFFFFF"></div>
+              <div class="color-dot" style="background:#2B2B2B;" title="#2B2B2B"></div>
+              <div class="color-dot" style="background:#E74C3C;" title="#E74C3C"></div>
+              <div class="color-dot" style="background:#3498DB;" title="#3498DB"></div>
+              <div class="color-dot" style="background:#F39C12;" title="#F39C12"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div class="palette-swatch" style="background: linear-gradient(135deg, #F5F0EB, #E8A87C 50%, #4A4A4A);"></div>
+          <div class="palette-info">
+            <div class="palette-name">Scandi-Indian Fusion</div>
+            <div class="palette-dots">
+              <div class="color-dot" style="background:#F5F0EB;" title="#F5F0EB"></div>
+              <div class="color-dot" style="background:#4A4A4A;" title="#4A4A4A"></div>
+              <div class="color-dot" style="background:#E8A87C;" title="#E8A87C"></div>
+              <div class="color-dot" style="background:#8B7355;" title="#8B7355"></div>
+              <div class="color-dot" style="background:#4CAF50;" title="#4CAF50"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── ENDPOINTS ── -->
+    <section>
+      <p class="section-label">REST API</p>
+      <h2 class="section-title">Clean, secure,<br/>rate-limited endpoints.</h2>
+      <p class="section-desc">
+        All routes prefixed with <code style="background:var(--surface-2);padding:2px 8px;border-radius:4px;color:var(--gold-light);font-size:14px;">/api</code>.
+        Authentication via JWT. Rate-limited at 200 req/15min.
+      </p>
+
+      <div class="endpoints-grid">
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/register</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/login</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/user/profile</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/home-design/styles</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/design-gen/generate</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/ai/query</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/product/list</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/category/all</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/boq/estimate</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/rfq/create</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/price-trends/history</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/bid/submit</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/inventory/items</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/reviews/product/:id</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/order/place</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/timelines/project/:id</span></div>
+      </div>
+    </section>
+
+    <!-- ── VERSION BANNER ── -->
+    <section style="padding-top: 0; padding-bottom: 80px;">
+      <div class="version-banner">
+        <div class="version-info">
+          <h3>Bricks Agent API <span style="color: var(--gold);">v2.0.0</span></h3>
+          <p>Node.js 18 · Express · MongoDB · Groq AI · Replicate · Cloudinary · Razorpay · Firebase</p>
+        </div>
+        <div class="version-badges">
+          <span class="badge badge-green">● Live</span>
+          <span class="badge badge-gold">v2.0.0 Stable</span>
+          <span class="badge badge-blue">Node 18+</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <p>© 2025 <span class="footer-brand">Bricks Agent</span> — Building India's Future, Powered by AI.</p>
+  </footer>
+
+</body>
+</html>
