@@ -1,8 +1,7 @@
-const { jwt, sg_mail, md5, fs, path, app } = require('../config');
+const { jwt, md5, app } = require('../config');
 const Seller = require("../Model/Seller");
 const Otp = require('../Model/Otp');
 const { randomString } = require('../Utils');
-const axios = require('axios');
 const { sendOtp } = require("../Utils/sms");
 const cloudinary = require("../Utils/cloudinary");
 
@@ -56,34 +55,10 @@ const signupSeller = async (req, res, next) => {
     }
 };
 
-const emailVerify = async (req, res, next) => {
-    const { email } = req.body;
-    try {
-        const seller = await Seller.findOne({ email, is_delete: 0 });
-        if (!seller) {
-            return res.status(401).send({ "status": 401, "data": null, "message": "Seller not found", "error": true });
-        }
-        let otpnum = Math.floor(1000 + Math.random() * 9000);
-        await Otp.updateMany({ "is_delete": 1 });
-        const otp = await Otp.create({ Otp: otpnum, seller: seller.id, email });
-        const msg = {
-            to: seller.email,
-            from: process.env.EMAIL,
-            subject: 'email verify',
-            text: 'OTP : ' + otp.Otp,
-            html: '<strong>OTP : ' + otp.Otp + '</strong>',
-        };
-        sg_mail.send(msg).then(() => {
-            return res.send({ "status": 200, "message": "Otp send successfully", "error": false });
-        }).catch((error) => {
-            console.error(error);
-            return res.status(500).send({ "status": 500, "message": "Otp send Failed", "error": true });
-        });
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
-    }
-};
+// Email OTP removed — authentication is mobile-OTP only.
+// TODO: WhatsApp OTP login (replace SMS flow) — coming soon.
+const emailVerify = (req, res) =>
+    res.status(410).json({ status: 410, data: null, message: 'Email OTP is no longer supported. Please use mobile OTP.', error: true });
 
 const otpVerifyLogin = async (req, res, next) => {
     const { phone, otp } = req.body;

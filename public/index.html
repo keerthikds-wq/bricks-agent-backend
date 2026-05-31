@@ -631,6 +631,74 @@
       </div>
     </section>
 
+    <!-- ── AUTH SYSTEM ── -->
+    <section id="auth">
+      <p class="section-label">Authentication</p>
+      <h2 class="section-title">Five user types.<br/>One unified OTP system.</h2>
+      <p class="section-desc">
+        All mobile logins use phone-based OTP via SMS. Email OTP has been removed.
+        WhatsApp login is coming next.
+      </p>
+
+      <div class="features-grid" style="margin-top: 48px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+
+        <div class="feature-card">
+          <div class="feature-icon">👤</div>
+          <div class="feature-title">User</div>
+          <div class="feature-desc">
+            Phone OTP login &amp; signup. JWT token, 3-day expiry.
+            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/auth/login</code>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🏪</div>
+          <div class="feature-title">Seller</div>
+          <div class="feature-desc">
+            Phone OTP login. Profile upload via Cloudinary. GST-linked account.
+            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/seller/login</code>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🏗️</div>
+          <div class="feature-title">Builder</div>
+          <div class="feature-desc">
+            Phone OTP login. License, project types &amp; geo-location supported.
+            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/builder/login</code>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧱</div>
+          <div class="feature-title">Masonry</div>
+          <div class="feature-desc">
+            Phone OTP login. Specializations, daily rates &amp; geo-radius.
+            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/masonry/login</code>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <div class="feature-title">Admin</div>
+          <div class="feature-desc">
+            Email + password login. JWT token with admin role claim.
+            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/admin/login</code>
+          </div>
+        </div>
+
+        <div class="feature-card" style="border-color: rgba(37,211,102,0.2); background: linear-gradient(135deg, #0F1320, #0A1A0F);">
+          <div class="feature-icon" style="background: rgba(37,211,102,0.08); border-color: rgba(37,211,102,0.2);">💬</div>
+          <div class="feature-title" style="color: #4ADE80;">WhatsApp Login <span style="font-size:11px;font-weight:400;color:#2A5C3A;margin-left:6px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);padding:2px 8px;border-radius:10px;">Coming Soon</span></div>
+          <div class="feature-desc">
+            WhatsApp OTP will replace SMS across all 5 user types — higher delivery
+            rates, richer notifications, and chat-based support flows.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- ── DESIGN PALETTES ── -->
     <section>
       <p class="section-label">Design System</p>
@@ -767,21 +835,25 @@
       </p>
 
       <div class="endpoints-grid">
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/register</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/login</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/user/profile</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/sign-up</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/login/otp-verify</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/seller/login</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/seller/login/otp-verify</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/builder/login</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/builder/login/otp-verify</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/masonry/login</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/masonry/login/otp-verify</span></div>
+        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/admin/login</span></div>
         <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/home-design/styles</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/design-gen/generate</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/ai/query</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/product/list</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/category/all</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/boq/estimate</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/rfq/create</span></div>
         <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/price-trends/history</span></div>
         <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/bid/submit</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/inventory/items</span></div>
+        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/product/list</span></div>
         <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/reviews/product/:id</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/order/place</span></div>
         <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/timelines/project/:id</span></div>
       </div>
     </section>

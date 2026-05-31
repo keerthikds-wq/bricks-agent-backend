@@ -1,8 +1,7 @@
-const { jwt, sg_mail, md5, fs, path } = require('../config');
+const { jwt, md5 } = require('../config');
 const Admin = require("../Model/Admin");
 const Otp = require('../Model/Otp');
 const { randomString } = require('../Utils');
-const { sendOtp } = require("../Utils/sms");
 
 const loginAdmin = async (req, res, next) => {
     const { email, password } = req.body;
@@ -41,100 +40,13 @@ const signupAdmin = async (req, res, next) => {
         return res.status(401).send({ "status": 401, "data": null, "message": "Something went wrong!", "error": true });
     }
 }
-const forgotPassword = async (req, res, next) => {
-    const { email } = req.body;
-    try {
-        const admin = await Admin.findOne({ email, is_delete: 0 });
-        if (!admin) {
-            return res.status(401).send({ "status": 401, "data": null, "message": "Admin not found", "error": true });
-        }
-        const otpnum = Math.floor(1000 + Math.random() * 9000);
-        await Otp.updateMany({ userId: admin.id }, { "is_delete": 1 });
-        await Otp.create({
-            Otp: otpnum,
-            userId: admin.id,
-            email
-        });
-        await sendOtp(phone, otpnum);
-       /*  const dynamic = `Your OTP for reset password on Bricks Agent account is ${otpnum}. It is valid for 10 mins.\nBricks Agent Team.\n(A Product of Swami Vivekananda Technologies Pvt Ltd).`
-        const url = 'https://api.textlocal.in/send/?apiKey=NzQ0MzdhNjU1NjU2MzY2MTZkNDEzOTYyNTQ0Mzc4NmU=&numbers=' + phone + '&sender=SVTPLC&message=' + encodeURIComponent(dynamic);
-                        axios
-                            .get(url)
-                            .then(function (response) {
-                                console.log('entered second');
-                                console.log(response.data);
-                            })
-                            .catch(function (error) {
-                                console.log(error);
-                            }); */
-        const msg = {
-            to: admin.email, // Change to your recipient
-            from: process.env.EMAIL, // Change to your verified sender
-            subject: 'forgot password',
-            text: 'OTP : ' + otpnum,
-            html: '<strong>OTP : ' + otpnum + '</strong>',
-        }
-        sg_mail.send(msg).then(() => {
-            console.log('Email sent');
-            console.log(admin.email);
-            return res.send({ "status": 200, "otp": otpnum, "message": "Otp send successfully", "error": false });
-        }).catch((error) => {
-            console.error(error)
-            return res.status(500).send({ "status": 500, "message": "Otp send Failed", "error": true });
-        });
-
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
-    }
-}
-const emailVerify = async (req, res, next) => {
-    const { email } = req.body;
-    try {
-        const admin = await Admin.findOne({ email, is_delete: 0 });
-        if (!admin) {
-            return res.status(401).send({ "status": 401, "data": null, "message": "Admin not found", "error": true });
-        }
-        let otpnum = Math.floor(100000 + Math.random() * 900000);
-        await Otp.updateMany({ "is_delete": 1 });
-        const otp = await Otp.create({
-            Otp: otpnum,
-            userId: admin.id,
-            email
-        });
-        await sendOtp(phone, otpnum);
-
-        /* const dynamic = `Your OTP for login to Bricks Agent account is ${otpnum}. It is valid for 10 mins.\nBricks Agent Team.\n(A Product of Swami Vivekananda Technologies Pvt Ltd).`
-        const url = 'https://api.textlocal.in/send/?apiKey=NzQ0MzdhNjU1NjU2MzY2MTZkNDEzOTYyNTQ0Mzc4NmU=&numbers=' + phone + '&sender=SVTPLC&message=' + encodeURIComponent(dynamic);
-                        axios
-                            .get(url)
-                            .then(function (response) {
-                                console.log('entered second');
-                                console.log(response.data);
-                            })
-                            .catch(function (error) {
-                                console.log(error);
-                            }); */
-        const msg = {
-            to: admin.email, // Change to your recipient
-            from: process.env.EMAIL, // Change to your verified sender
-            subject: 'email verify',
-            text: 'OTP : ' + otp.Otp,
-            html: '<strong>OTP : ' + otp.Otp + '</strong>',
-        }
-        sg_mail.send(msg).then(() => {
-            console.log('Email sent');
-            return res.send({ "status": 200, "message": "Otp send successfully", "error": false });
-        }).catch((error) => {
-            console.error(error)
-            return res.status(500).send({ "status": 500, "message": "Otp send Failed", "error": true });
-        });
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
-    }
-
-}
+// TODO: forgot-password via WhatsApp OTP — coming soon.
+const forgotPassword = (req, res) =>
+    res.status(410).json({ status: 410, data: null, message: 'Email-based password reset is no longer supported. WhatsApp reset coming soon.', error: true });
+// Email OTP removed — use admin password login.
+// TODO: WhatsApp OTP for admin — coming soon.
+const emailVerify = (req, res) =>
+    res.status(410).json({ status: 410, data: null, message: 'Email OTP is no longer supported.', error: true });
 const changePassword = async (req, res, next) => {
     const { email, password, prevpassword } = req.body;
     try {
