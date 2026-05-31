@@ -5,26 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bricks Agent — AI-Powered Construction Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
+    /* ── Reset & Base ─────────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
 
     :root {
-      --gold:        #C9922A;
-      --gold-light:  #E8B84B;
-      --gold-dim:    rgba(201,146,42,0.12);
-      --gold-border: rgba(201,146,42,0.18);
-      --orange:      #E86420;
-      --bg:          #07090F;
-      --surface:     #0F1320;
-      --surface-2:   #151C2E;
-      --text-1:      #F0F2F8;
-      --text-2:      #8A95A8;
-      --text-3:      #454E60;
-      --radius:      14px;
+      --bg:           #060812;
+      --surface:      #0C1120;
+      --surface-2:    #111829;
+      --surface-3:    #16203A;
+      --gold:         #D4A843;
+      --gold-2:       #F0C060;
+      --gold-3:       #A07830;
+      --orange:       #E8622A;
+      --green:        #22C55E;
+      --blue:         #3B82F6;
+      --red:          #EF4444;
+      --amber:        #F59E0B;
+      --text-1:       #F1F3F9;
+      --text-2:       #8895AA;
+      --text-3:       #3D4860;
+      --border:       rgba(212,168,67,0.10);
+      --border-h:     rgba(212,168,67,0.28);
+      --glow:         rgba(212,168,67,0.15);
+      --r-sm:         8px;
+      --r-md:         14px;
+      --r-lg:         20px;
+      --r-xl:         28px;
     }
-
-    html { scroll-behavior: smooth; }
 
     body {
       background: var(--bg);
@@ -32,108 +42,143 @@
       font-family: 'Inter', system-ui, sans-serif;
       line-height: 1.6;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Grid texture ── */
+    /* ── Scrollbar ────────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--gold-3); border-radius: 2px; }
+
+    /* ── Canvas background ────────────────────────────────────────────────────── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Noise texture overlay ────────────────────────────────────────────────── */
     body::before {
       content: '';
       position: fixed;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(201,146,42,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(201,146,42,0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      opacity: 1;
       pointer-events: none;
-      z-index: 0;
+      z-index: 1;
     }
 
-    /* ── Glow orbs ── */
-    .orb {
+    /* ── Grid lines ───────────────────────────────────────────────────────────── */
+    body::after {
+      content: '';
       position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(212,168,67,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212,168,67,0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
       pointer-events: none;
-      z-index: 0;
-      animation: drift 18s ease-in-out infinite alternate;
-    }
-    .orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(201,146,42,0.08) 0%, transparent 70%); top: -200px; right: -200px; }
-    .orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(232,100,32,0.06) 0%, transparent 70%); bottom: -150px; left: -150px; animation-delay: -9s; }
-
-    @keyframes drift {
-      from { transform: translate(0, 0) scale(1); }
-      to   { transform: translate(30px, 20px) scale(1.05); }
+      z-index: 1;
     }
 
-    /* ── Layout ── */
-    .page { position: relative; z-index: 1; }
+    /* ── Page wrapper ─────────────────────────────────────────────────────────── */
+    .page { position: relative; z-index: 2; }
 
+    /* ── Scroll reveal ────────────────────────────────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(36px);
+      transition: opacity 0.72s cubic-bezier(0.16,1,0.3,1),
+                  transform 0.72s cubic-bezier(0.16,1,0.3,1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.08s; }
+    .reveal-delay-2 { transition-delay: 0.16s; }
+    .reveal-delay-3 { transition-delay: 0.24s; }
+    .reveal-delay-4 { transition-delay: 0.32s; }
+    .reveal-delay-5 { transition-delay: 0.40s; }
+    .reveal-delay-6 { transition-delay: 0.48s; }
+
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  NAV                                                                       */
+    /* ────────────────────────────────────────────────────────────────────────── */
     nav {
       position: fixed;
       top: 0; left: 0; right: 0;
-      z-index: 100;
+      z-index: 200;
+      height: 66px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 48px;
-      height: 68px;
-      background: rgba(7,9,15,0.8);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--gold-border);
+      background: rgba(6,8,18,0.72);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.3s;
     }
 
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      display: flex; align-items: center; gap: 12px;
       text-decoration: none;
     }
 
-    .brand-icon {
+    .brand-bricks-svg {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
+      grid-template-columns: 11px 8px 9px;
+      grid-template-rows: 9px 9px;
       gap: 2px;
-      width: 26px;
-      height: 18px;
     }
-    .brick { border-radius: 2px; background: var(--gold); }
-    .brick:nth-child(1) { grid-column: span 2; background: var(--gold-light); }
-    .brick:nth-child(4) { grid-column: span 1; background: var(--gold-light); }
-    .brick:nth-child(5) { grid-column: span 2; }
+    .b { border-radius: 2px; }
+    .b1 { background: var(--gold-2); grid-column: span 2; }
+    .b2 { background: var(--gold); }
+    .b3 { background: var(--gold); }
+    .b4 { background: var(--gold-2); grid-column: span 2; }
+    .b5 { background: var(--gold-3); }
 
     .brand-name {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
+      letter-spacing: 1px;
     }
-    .brand-name .bricks { color: #FFFFFF; }
-    .brand-name .agent  { color: var(--gold); }
+    .brand-name .w { color: #fff; }
+    .brand-name .g { color: var(--gold); }
 
-    .nav-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--text-2);
-      background: rgba(34,197,94,0.08);
-      border: 1px solid rgba(34,197,94,0.2);
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+
+    .nav-pill {
+      display: flex; align-items: center; gap: 7px;
       padding: 6px 14px;
       border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
     }
-    .status-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
+    .nav-pill.green {
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      color: #4ADE80;
+    }
+    .nav-pill.gold {
+      background: rgba(212,168,67,0.08);
+      border: 1px solid rgba(212,168,67,0.2);
+      color: var(--gold-2);
+    }
+    .pulse-dot {
+      width: 6px; height: 6px; border-radius: 50%;
       background: #22C55E;
-      animation: pulse 2s ease infinite;
+      animation: pulseDot 2s ease infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
-      50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+    @keyframes pulseDot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
     }
 
-    /* ── Hero ── */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  HERO                                                                      */
+    /* ────────────────────────────────────────────────────────────────────────── */
     .hero {
       min-height: 100vh;
       display: flex;
@@ -141,744 +186,1249 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 120px 24px 80px;
+      padding: 130px 24px 80px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .hero-eyebrow {
+    /* Radial glow behind hero text */
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -55%);
+      width: 800px; height: 500px;
+      background: radial-gradient(ellipse, rgba(212,168,67,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--gold-dim);
-      border: 1px solid var(--gold-border);
-      border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 12px;
+      background: rgba(212,168,67,0.07);
+      border: 1px solid rgba(212,168,67,0.2);
+      border-radius: 24px;
+      padding: 7px 18px;
+      font-size: 11.5px;
       font-weight: 600;
-      letter-spacing: 2px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: var(--gold-light);
-      margin-bottom: 32px;
+      color: var(--gold-2);
+      margin-bottom: 36px;
+      animation: badgeFade 1s ease both;
+    }
+    @keyframes badgeFade {
+      from { opacity: 0; transform: translateY(-12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-badge-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--gold);
+      animation: pulseDot 2.5s ease infinite;
     }
 
     .hero-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: clamp(48px, 8vw, 88px);
+      font-size: clamp(52px, 9vw, 100px);
       font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -2px;
-      margin-bottom: 24px;
+      line-height: 1.0;
+      letter-spacing: -3px;
+      margin-bottom: 28px;
+      animation: titleSlide 1s cubic-bezier(0.16,1,0.3,1) 0.1s both;
+    }
+    @keyframes titleSlide {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
-    .hero-title .line-1 { color: #FFFFFF; display: block; }
-    .hero-title .line-2 {
+    .hero-title .solid { color: #fff; display: block; }
+    .hero-title .grad {
       display: block;
-      background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 50%, var(--orange) 100%);
+      background: linear-gradient(100deg, var(--gold) 0%, var(--gold-2) 40%, var(--orange) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      background-size: 200%;
+      animation: gradShift 5s ease infinite alternate;
+    }
+    @keyframes gradShift {
+      from { background-position: 0% 50%; }
+      to   { background-position: 100% 50%; }
     }
 
     .hero-desc {
       font-size: 18px;
       color: var(--text-2);
-      max-width: 560px;
-      margin: 0 auto 48px;
-      line-height: 1.75;
+      max-width: 540px;
+      margin: 0 auto 52px;
+      line-height: 1.8;
+      animation: titleSlide 1s cubic-bezier(0.16,1,0.3,1) 0.2s both;
     }
 
-    .hero-actions {
+    .hero-ctas {
       display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
+      gap: 14px;
       justify-content: center;
+      flex-wrap: wrap;
       margin-bottom: 80px;
+      animation: titleSlide 1s cubic-bezier(0.16,1,0.3,1) 0.3s both;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-      color: #0A0B0F;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-2) 100%);
+      color: #0A0600;
       font-weight: 700;
       font-size: 14px;
-      padding: 14px 32px;
-      border-radius: 10px;
+      padding: 14px 30px;
+      border-radius: var(--r-md);
       border: none;
       cursor: pointer;
       text-decoration: none;
-      letter-spacing: 0.5px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 24px rgba(201,146,42,0.3);
+      letter-spacing: 0.3px;
+      transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+      box-shadow: 0 6px 28px rgba(212,168,67,0.35), 0 0 0 0 rgba(212,168,67,0.3);
     }
     .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 36px rgba(201,146,42,0.45);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(212,168,67,0.50);
+      filter: brightness(1.08);
     }
+    .btn-primary:active { transform: translateY(0); }
 
-    .btn-secondary {
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
       background: transparent;
       color: var(--text-1);
       font-weight: 500;
       font-size: 14px;
-      padding: 13px 30px;
-      border-radius: 10px;
-      border: 1px solid rgba(240,242,248,0.12);
+      padding: 13px 28px;
+      border-radius: var(--r-md);
+      border: 1px solid rgba(255,255,255,0.10);
       cursor: pointer;
       text-decoration: none;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
     }
-    .btn-secondary:hover {
-      border-color: var(--gold-border);
-      background: var(--gold-dim);
+    .btn-ghost:hover {
+      border-color: var(--border-h);
+      background: var(--glow);
+      transform: translateY(-2px);
     }
 
-    /* ── Stats bar ── */
-    .stats-bar {
+    /* Hero stats */
+    .hero-stats {
       display: flex;
-      gap: 0;
-      border: 1px solid var(--gold-border);
-      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
       overflow: hidden;
-      background: var(--surface);
+      background: rgba(12,17,32,0.7);
+      backdrop-filter: blur(16px);
+      animation: titleSlide 1s cubic-bezier(0.16,1,0.3,1) 0.4s both;
     }
-    .stat-item {
+
+    .stat {
       flex: 1;
-      padding: 20px 28px;
+      padding: 22px 30px;
       text-align: center;
-      border-right: 1px solid var(--gold-border);
+      border-right: 1px solid var(--border);
+      position: relative;
     }
-    .stat-item:last-child { border-right: none; }
-    .stat-value {
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--gold-light);
+    .stat:last-child { border-right: none; }
+
+    .stat-num {
       font-family: 'Space Grotesk', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--gold-2);
       display: block;
+      line-height: 1;
+      margin-bottom: 6px;
     }
-    .stat-label {
+    .stat-lbl {
       font-size: 11px;
       color: var(--text-3);
       text-transform: uppercase;
       letter-spacing: 1.5px;
-      margin-top: 4px;
-      display: block;
     }
 
-    /* ── Sections ── */
-    section {
-      padding: 100px 24px;
-      max-width: 1100px;
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  SECTIONS                                                                  */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .section {
+      max-width: 1120px;
       margin: 0 auto;
+      padding: 110px 24px;
     }
 
-    .section-label {
+    .section-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 11px;
       font-weight: 600;
-      letter-spacing: 3px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
       color: var(--gold);
-      margin-bottom: 16px;
+      margin-bottom: 18px;
+    }
+    .section-eyebrow::before {
+      content: '';
+      display: block;
+      width: 20px; height: 1px;
+      background: var(--gold);
+      flex-shrink: 0;
     }
 
     .section-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: clamp(32px, 4vw, 48px);
+      font-size: clamp(34px, 4vw, 52px);
       font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -1px;
+      line-height: 1.12;
+      letter-spacing: -1.5px;
       margin-bottom: 20px;
     }
+    .section-title .g {
+      background: linear-gradient(100deg, var(--gold) 0%, var(--gold-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-    .section-desc {
+    .section-sub {
       font-size: 16px;
       color: var(--text-2);
-      max-width: 560px;
-      line-height: 1.75;
+      max-width: 520px;
+      line-height: 1.8;
     }
 
-    /* ── Feature grid ── */
-    .features-grid {
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  FEATURE CARDS                                                             */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .cards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 60px;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 18px;
+      margin-top: 64px;
     }
 
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--gold-border);
-      border-radius: var(--radius);
-      padding: 32px;
-      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    .card {
       position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 32px;
       overflow: hidden;
+      transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1),
+                  box-shadow 0.4s;
+      cursor: default;
     }
-    .feature-card::before {
+
+    .card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 2px;
-      background: linear-gradient(90deg, var(--gold), var(--orange));
+      background: linear-gradient(90deg, var(--gold), var(--orange), var(--gold));
+      background-size: 200%;
       opacity: 0;
       transition: opacity 0.3s;
+      animation: shimmerLine 3s linear infinite;
     }
-    .feature-card:hover {
-      border-color: rgba(201,146,42,0.35);
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    @keyframes shimmerLine {
+      from { background-position: 0%; }
+      to   { background-position: 200%; }
     }
-    .feature-card:hover::before { opacity: 1; }
 
-    .feature-icon {
-      width: 48px; height: 48px;
-      background: var(--gold-dim);
-      border: 1px solid var(--gold-border);
-      border-radius: 12px;
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 0%, rgba(212,168,67,0.05) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .card:hover {
+      border-color: var(--border-h);
+      transform: translateY(-6px);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(212,168,67,0.08);
+    }
+    .card:hover::before { opacity: 1; }
+    .card:hover::after  { opacity: 1; }
+
+    .card-icon {
+      width: 52px; height: 52px;
+      background: rgba(212,168,67,0.08);
+      border: 1px solid rgba(212,168,67,0.16);
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      margin-bottom: 20px;
+      font-size: 24px;
+      margin-bottom: 22px;
+      transition: background 0.3s, transform 0.3s;
+    }
+    .card:hover .card-icon {
+      background: rgba(212,168,67,0.14);
+      transform: scale(1.08) rotate(-4deg);
     }
 
-    .feature-title {
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
       font-size: 17px;
       font-weight: 600;
       margin-bottom: 10px;
       color: var(--text-1);
     }
 
-    .feature-desc {
+    .card-desc {
       font-size: 14px;
       color: var(--text-2);
-      line-height: 1.7;
+      line-height: 1.75;
     }
 
-    /* ── Endpoints ── */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  AUTH SECTION                                                              */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .auth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 56px;
+    }
+
+    .auth-card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
+    }
+    .auth-card:hover {
+      border-color: var(--border-h);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+    }
+
+    .auth-card.whatsapp {
+      border-color: rgba(34,197,94,0.18);
+      background: linear-gradient(135deg, #0C1120 0%, #0A1A10 100%);
+    }
+    .auth-card.whatsapp:hover { border-color: rgba(34,197,94,0.35); }
+
+    .auth-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .auth-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+    }
+    .auth-badge.active {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.2);
+      color: #4ADE80;
+    }
+    .auth-badge.soon {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.2);
+      color: #FCD34D;
+    }
+
+    .auth-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    .auth-route {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 11.5px;
+      color: var(--gold);
+      background: rgba(212,168,67,0.06);
+      border: 1px solid rgba(212,168,67,0.12);
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  MATERIALS SHOWCASE                                                        */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .materials-section {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .materials-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 56px;
+      flex-wrap: wrap;
+    }
+
+    .mat-cat {
+      flex: 1;
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .mat-cat:hover { border-color: var(--border-h); transform: translateY(-3px); }
+
+    .mat-cat-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mat-cat-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .mat-icons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .mat-icon-wrap {
+      aspect-ratio: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .mat-icon-wrap:hover {
+      background: rgba(212,168,67,0.08);
+      border-color: var(--border-h);
+      transform: scale(1.1);
+    }
+    .mat-icon-wrap img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      filter: brightness(0) invert(1) sepia(0.2);
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    .mat-icon-wrap:hover img { opacity: 0.9; }
+
+    .mat-count {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  DESIGN PALETTES                                                           */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .palettes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 16px;
+      margin-top: 56px;
+    }
+
+    .palette-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .palette-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--border-h);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+    }
+
+    .palette-swatch {
+      height: 88px;
+      position: relative;
+    }
+
+    .palette-body {
+      padding: 16px 18px;
+    }
+
+    .palette-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 4px;
+    }
+
+    .palette-hint {
+      font-size: 11.5px;
+      color: var(--text-3);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .dots {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .dot {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.08);
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+      position: relative;
+    }
+    .dot:hover {
+      transform: scale(1.35);
+      border-color: rgba(255,255,255,0.25);
+      z-index: 1;
+    }
+    .dot[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      color: var(--text-1);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  ENDPOINTS                                                                 */
+    /* ────────────────────────────────────────────────────────────────────────── */
     .endpoints-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 12px;
-      margin-top: 48px;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 10px;
+      margin-top: 52px;
     }
 
-    .endpoint-chip {
+    .ep {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 12px 16px;
       background: var(--surface);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
       font-size: 13px;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
     }
-    .endpoint-chip:hover { border-color: var(--gold-border); }
+    .ep:hover {
+      border-color: var(--border-h);
+      background: var(--surface-2);
+      transform: translateX(3px);
+    }
 
     .method {
       font-size: 10px;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: 5px;
       flex-shrink: 0;
     }
-    .method.get    { background: rgba(34,197,94,0.12);  color: #4ADE80; }
-    .method.post   { background: rgba(59,130,246,0.12); color: #60A5FA; }
-    .method.put    { background: rgba(245,158,11,0.12); color: #FCD34D; }
-    .method.delete { background: rgba(239,68,68,0.12);  color: #F87171; }
+    .GET    { background: rgba(34,197,94,0.1);   color: #4ADE80; border: 1px solid rgba(34,197,94,0.2);   }
+    .POST   { background: rgba(59,130,246,0.1);  color: #60A5FA; border: 1px solid rgba(59,130,246,0.2);  }
+    .PUT    { background: rgba(245,158,11,0.1);  color: #FCD34D; border: 1px solid rgba(245,158,11,0.2);  }
+    .DELETE { background: rgba(239,68,68,0.1);   color: #F87171; border: 1px solid rgba(239,68,68,0.2);   }
+    .PATCH  { background: rgba(139,92,246,0.1);  color: #C4B5FD; border: 1px solid rgba(139,92,246,0.2);  }
 
-    .endpoint-path {
-      color: var(--text-2);
+    .ep-path {
       font-family: 'Space Grotesk', monospace;
       font-size: 12px;
+      color: var(--text-2);
     }
 
-    /* ── Color palette showcase ── */
-    .palette-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-top: 48px;
-    }
-
-    .palette-card {
-      border-radius: var(--radius);
-      overflow: hidden;
-      border: 1px solid var(--gold-border);
-      background: var(--surface);
-    }
-
-    .palette-swatch {
-      height: 80px;
-    }
-
-    .palette-info {
-      padding: 14px 16px;
-    }
-
-    .palette-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-1);
-      margin-bottom: 6px;
-    }
-
-    .palette-dots {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .color-dot {
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.1);
-      cursor: pointer;
-      transition: transform 0.15s;
-    }
-    .color-dot:hover { transform: scale(1.3); }
-
-    /* ── Version banner ── */
-    .version-banner {
-      background: linear-gradient(135deg, var(--surface) 0%, #0D1628 100%);
-      border: 1px solid var(--gold-border);
-      border-radius: var(--radius);
-      padding: 40px 48px;
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  STACK BANNER                                                              */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .stack-banner {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface-3) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 44px 52px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
+      gap: 28px;
       flex-wrap: wrap;
-      margin-top: 60px;
+      margin-top: 80px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .version-info h3 {
+    .stack-banner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), var(--orange), transparent);
+    }
+
+    .stack-left h3 {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .version-info p { font-size: 14px; color: var(--text-2); }
+    .stack-left h3 span { color: var(--gold); }
+    .stack-left p { font-size: 14px; color: var(--text-2); }
 
-    .version-badges {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
+    .stack-badges { display: flex; gap: 10px; flex-wrap: wrap; }
 
-    .badge {
-      padding: 6px 14px;
+    .sbadge {
+      padding: 6px 16px;
       border-radius: 20px;
       font-size: 12px;
       font-weight: 500;
     }
-    .badge-green  { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.25);  color: #4ADE80; }
-    .badge-gold   { background: rgba(201,146,42,0.1); border: 1px solid rgba(201,146,42,0.25); color: var(--gold-light); }
-    .badge-blue   { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25); color: #A5B4FC; }
+    .sbadge.green  { background: rgba(34,197,94,0.08);  border:1px solid rgba(34,197,94,0.2);  color:#4ADE80; }
+    .sbadge.gold   { background: rgba(212,168,67,0.08); border:1px solid rgba(212,168,67,0.2); color:var(--gold-2); }
+    .sbadge.blue   { background: rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); color:#A5B4FC; }
+    .sbadge.orange { background: rgba(232,98,42,0.08);  border:1px solid rgba(232,98,42,0.2);  color:#FCA97A; }
 
-    /* ── Footer ── */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  DIVIDER                                                                   */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-h), transparent);
+      margin: 0 24px;
+    }
+
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  FOOTER                                                                    */
+    /* ────────────────────────────────────────────────────────────────────────── */
     footer {
       text-align: center;
-      padding: 40px 24px;
-      border-top: 1px solid rgba(255,255,255,0.05);
+      padding: 48px 24px;
+    }
+
+    .footer-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
     }
 
     footer p {
       font-size: 13px;
       color: var(--text-3);
+      line-height: 1.8;
     }
+    footer a { color: var(--gold); text-decoration: none; }
+    footer a:hover { color: var(--gold-2); }
 
-    footer .footer-brand {
-      font-weight: 600;
-      color: var(--gold);
-    }
-
-    /* ── Responsive ── */
+    /* ────────────────────────────────────────────────────────────────────────── */
+    /*  RESPONSIVE                                                                */
+    /* ────────────────────────────────────────────────────────────────────────── */
     @media (max-width: 768px) {
       nav { padding: 0 20px; }
+      .nav-right .nav-pill.gold { display: none; }
       .hero { padding: 100px 20px 60px; }
-      .stats-bar { flex-direction: column; }
-      .stat-item { border-right: none; border-bottom: 1px solid var(--gold-border); }
-      .stat-item:last-child { border-bottom: none; }
-      .version-banner { flex-direction: column; }
-      .feature-card { padding: 24px; }
+      .hero-stats { flex-direction: column; }
+      .stat { border-right: none; border-bottom: 1px solid var(--border); }
+      .stat:last-child { border-bottom: none; }
+      .section { padding: 70px 20px; }
+      .stack-banner { flex-direction: column; padding: 32px 24px; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .auth-grid  { grid-template-columns: 1fr; }
+      .mat-icons  { grid-template-columns: repeat(3,1fr); }
     }
   </style>
 </head>
 <body>
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
 
-  <!-- ── NAV ── -->
+<!-- Canvas for animated particles -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="page">
+
+  <!-- ══ NAV ════════════════════════════════════════════════════════════════════ -->
   <nav>
     <a class="brand" href="#">
-      <div class="brand-icon">
-        <div class="brick"></div>
-        <div class="brick"></div>
-        <div class="brick"></div>
-        <div class="brick"></div>
-        <div class="brick"></div>
-        <div class="brick"></div>
+      <div class="brand-bricks-svg">
+        <div class="b b1"></div>
+        <div class="b b2"></div>
+        <div class="b b3"></div>
+        <div class="b b4"></div>
+        <div class="b b5"></div>
       </div>
       <div class="brand-name">
-        <span class="bricks">Bricks</span><span class="agent"> Agent</span>
+        <span class="w">Bricks</span><span class="g"> Agent</span>
       </div>
     </a>
-    <div class="nav-status">
-      <div class="status-dot"></div>
-      API v2.0 — All systems operational
+    <div class="nav-right">
+      <div class="nav-pill gold">v2.0.0 Stable</div>
+      <div class="nav-pill green">
+        <div class="pulse-dot"></div>
+        All Systems Live
+      </div>
     </div>
   </nav>
 
-  <div class="page">
+  <!-- ══ HERO ═══════════════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      AI-Powered Construction Intelligence
+    </div>
+    <h1 class="hero-title">
+      <span class="solid">Build Smarter.</span>
+      <span class="grad">Design Bolder.</span>
+    </h1>
+    <p class="hero-desc">
+      India's premier AI platform for construction estimation, intelligent home design,
+      real-time material pricing, and end-to-end project management.
+    </p>
+    <div class="hero-ctas">
+      <a href="/api/health" class="btn-primary">
+        <span>API Health Check</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#features" class="btn-ghost">
+        Explore Platform
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
 
-    <!-- ── HERO ── -->
-    <section class="hero">
-      <div class="hero-eyebrow">
-        ✦ AI-Powered Construction Intelligence
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-num" data-target="35">0</span>
+        <span class="stat-lbl">API Endpoints</span>
       </div>
-      <h1 class="hero-title">
-        <span class="line-1">Build Smarter.</span>
-        <span class="line-2">Design Bolder.</span>
-      </h1>
-      <p class="hero-desc">
-        Bricks Agent is India's premier AI platform for construction estimation, home design,
-        material intelligence, and end-to-end project management.
-      </p>
-      <div class="hero-actions">
-        <a href="/api/health" class="btn-primary">Check API Status</a>
-        <a href="#features" class="btn-secondary">Explore Features →</a>
+      <div class="stat">
+        <span class="stat-num" data-target="23">0</span>
+        <span class="stat-lbl">Design Styles</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="47">0</span>
+        <span class="stat-lbl">Material Icons</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-str="AI">AI</span>
+        <span class="stat-lbl">Groq + Replicate</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ FEATURES ═══════════════════════════════════════════════════════════════ -->
+  <section class="section" id="features">
+    <div class="reveal">
+      <div class="section-eyebrow">Core Platform</div>
+      <h2 class="section-title">Everything a construction<br/><span class="g">project needs.</span></h2>
+      <p class="section-sub">From AI-generated renders to live material pricing — Bricks Agent covers every layer of the build lifecycle.</p>
+    </div>
+
+    <div class="cards-grid">
+      <div class="card reveal reveal-delay-1">
+        <div class="card-icon">🏗️</div>
+        <div class="card-title">BOQ Estimation</div>
+        <div class="card-desc">AI-powered Bill of Quantities with real-time material pricing, automatic area calculations, and granular cost breakdowns by category.</div>
+      </div>
+      <div class="card reveal reveal-delay-2">
+        <div class="card-icon">🎨</div>
+        <div class="card-title">Interior Design Generation</div>
+        <div class="card-desc">Generate photorealistic room renders via Replicate AI. 23 unique styles — Traditional Indian, Rajasthani Haveli, Cyberpunk, Scandi, and more.</div>
+      </div>
+      <div class="card reveal reveal-delay-3">
+        <div class="card-icon">🧱</div>
+        <div class="card-title">Material Intelligence</div>
+        <div class="card-desc">47+ SVG-illustrated material categories — structural, finishing, plumbing, electrical, doors & windows — with brand-level specifications.</div>
+      </div>
+      <div class="card reveal reveal-delay-4">
+        <div class="card-icon">📊</div>
+        <div class="card-title">Price Trend Analytics</div>
+        <div class="card-desc">Track construction material prices over time. Auto-seeded with market trend data for smarter procurement decisions.</div>
+      </div>
+      <div class="card reveal reveal-delay-5">
+        <div class="card-icon">🤝</div>
+        <div class="card-title">RFQ & Bidding</div>
+        <div class="card-desc">End-to-end Request for Quotation workflows connecting buyers with verified sellers, builders, and masonry contractors.</div>
+      </div>
+      <div class="card reveal reveal-delay-6">
+        <div class="card-icon">🤖</div>
+        <div class="card-title">AI Assistant</div>
+        <div class="card-desc">Powered by Groq's LLM — answers construction queries, guides material selection, and assists with real-time project planning.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ AUTH ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="auth">
+    <div class="reveal">
+      <div class="section-eyebrow">Authentication</div>
+      <h2 class="section-title">Five user types.<br/><span class="g">One mobile OTP system.</span></h2>
+      <p class="section-sub">All logins use phone-based OTP via SMS. Email OTP removed. WhatsApp OTP is next.</p>
+    </div>
+
+    <div class="auth-grid">
+      <div class="auth-card reveal reveal-delay-1">
+        <span class="auth-icon">👤</span>
+        <div class="auth-name">User <span class="auth-badge active">Active</span></div>
+        <div class="auth-desc">Phone OTP login &amp; signup with Cloudinary profile upload, GST, geo-location, and JWT token (3-day expiry).</div>
+        <span class="auth-route">POST /api/auth/login</span>
+      </div>
+      <div class="auth-card reveal reveal-delay-2">
+        <span class="auth-icon">🏪</span>
+        <div class="auth-name">Seller <span class="auth-badge active">Active</span></div>
+        <div class="auth-desc">Phone OTP login. Cloudinary profile, GSTIN, location &amp; service area. Verified seller badge.</div>
+        <span class="auth-route">POST /api/seller/login</span>
+      </div>
+      <div class="auth-card reveal reveal-delay-3">
+        <span class="auth-icon">🏗️</span>
+        <div class="auth-name">Builder <span class="auth-badge active">Active</span></div>
+        <div class="auth-desc">Phone OTP login. License number, project types, team size, min/max project value &amp; geo-radius.</div>
+        <span class="auth-route">POST /api/builder/login</span>
+      </div>
+      <div class="auth-card reveal reveal-delay-4">
+        <span class="auth-icon">🧱</span>
+        <div class="auth-name">Masonry <span class="auth-badge active">Active</span></div>
+        <div class="auth-desc">Phone OTP login. Specializations, daily/project rates, experience years &amp; geospatial search.</div>
+        <span class="auth-route">POST /api/masonry/login</span>
+      </div>
+      <div class="auth-card reveal reveal-delay-5">
+        <span class="auth-icon">🔐</span>
+        <div class="auth-name">Admin <span class="auth-badge active">Active</span></div>
+        <div class="auth-desc">Email + password login with MD5-hashed credentials. JWT token with isAdmin role claim.</div>
+        <span class="auth-route">POST /api/admin/login</span>
+      </div>
+      <div class="auth-card whatsapp reveal reveal-delay-6">
+        <span class="auth-icon">💬</span>
+        <div class="auth-name" style="color:#4ADE80">WhatsApp Login <span class="auth-badge soon">Coming Soon</span></div>
+        <div class="auth-desc">WhatsApp OTP will replace SMS across all 5 user types — higher delivery rates, richer flows, and chat-based support.</div>
+        <span class="auth-route" style="border-color:rgba(34,197,94,0.2);color:#4ADE80;background:rgba(34,197,94,0.06)">POST /api/auth/whatsapp-verify</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ MATERIALS ══════════════════════════════════════════════════════════════ -->
+  <section class="section materials-section">
+    <div class="reveal">
+      <div class="section-eyebrow">Material Library</div>
+      <h2 class="section-title">47 material icons,<br/><span class="g">4 categories.</span></h2>
+      <p class="section-sub">Every material in the catalog is backed by a precision SVG illustration — served as static assets at <code style="background:var(--surface-2);padding:2px 8px;border-radius:5px;color:var(--gold);font-size:13px">/public/materials/</code></p>
+    </div>
+
+    <div class="materials-row">
+      <div class="mat-cat reveal reveal-delay-1">
+        <div class="mat-cat-title">Structural</div>
+        <div class="mat-icons">
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/cement_bag.svg" alt="Cement" title="Cement Bag"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/red_bricks.svg" alt="Bricks" title="Red Bricks"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/steel_rods.svg" alt="Steel" title="Steel Rods"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/sand_pile.svg" alt="Sand" title="Sand Pile"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/aggregate_stone.svg" alt="Aggregate" title="Aggregate Stone"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/concrete_mix.svg" alt="Concrete" title="Concrete Mix"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/fly_ash_brick.svg" alt="Fly Ash" title="Fly Ash Brick"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/structural/aac_block.svg" alt="AAC" title="AAC Block"/></div>
+        </div>
+        <div class="mat-count">13 materials</div>
       </div>
 
-      <!-- Stats -->
-      <div class="stats-bar">
-        <div class="stat-item">
-          <span class="stat-value">35+</span>
-          <span class="stat-label">API Endpoints</span>
+      <div class="mat-cat reveal reveal-delay-2">
+        <div class="mat-cat-title">Finishing</div>
+        <div class="mat-icons">
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/floor_tile.svg" alt="Tile" title="Floor Tile"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/paint_bucket.svg" alt="Paint" title="Paint Bucket"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/granite_slab.svg" alt="Granite" title="Granite Slab"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/marble_slab.svg" alt="Marble" title="Marble Slab"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/gypsum_board.svg" alt="Gypsum" title="Gypsum Board"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/wall_tile.svg" alt="Wall Tile" title="Wall Tile"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/primer.svg" alt="Primer" title="Primer"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/finishing/putty.svg" alt="Putty" title="Putty"/></div>
         </div>
-        <div class="stat-item">
-          <span class="stat-value">23</span>
-          <span class="stat-label">Design Styles</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">8</span>
-          <span class="stat-label">Indian Style Palettes</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">AI</span>
-          <span class="stat-label">Groq + Replicate</span>
-        </div>
+        <div class="mat-count">12 materials</div>
       </div>
-    </section>
 
-    <!-- ── FEATURES ── -->
-    <section id="features">
-      <p class="section-label">Core Platform</p>
-      <h2 class="section-title">Everything a construction<br/>project needs.</h2>
-      <p class="section-desc">
-        From AI-generated interior renders to real-time material pricing —
-        Bricks Agent covers every layer of the build lifecycle.
-      </p>
-
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">🏗️</div>
-          <div class="feature-title">BOQ Estimation</div>
-          <div class="feature-desc">
-            AI-powered Bill of Quantities with real-time material pricing, automatic
-            area calculations, and cost breakdowns by category.
-          </div>
+      <div class="mat-cat reveal reveal-delay-3">
+        <div class="mat-cat-title">Plumbing &amp; Electrical</div>
+        <div class="mat-icons">
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/pvc_pipe.svg" alt="PVC" title="PVC Pipe"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/tap_faucet.svg" alt="Tap" title="Tap Faucet"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/electrical_wire.svg" alt="Wire" title="Electrical Wire"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/switch_socket.svg" alt="Switch" title="Switch Socket"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/mcb.svg" alt="MCB" title="MCB"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/water_tank.svg" alt="Tank" title="Water Tank"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/db_box.svg" alt="DB Box" title="Distribution Box"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/plumbing_electrical/gi_pipe.svg" alt="GI" title="GI Pipe"/></div>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon">🎨</div>
-          <div class="feature-title">Interior Design Generation</div>
-          <div class="feature-desc">
-            Generate photorealistic room renders from text prompts. Supports 23 unique
-            styles including Traditional Indian, Rajasthani Haveli, Scandinavian, and more.
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🧱</div>
-          <div class="feature-title">Material Intelligence</div>
-          <div class="feature-desc">
-            Smart product catalog with 47+ material categories — structural, finishing,
-            plumbing, electrical, doors & windows — with brand-level specifications.
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">📊</div>
-          <div class="feature-title">Price Trend Analytics</div>
-          <div class="feature-desc">
-            Track construction material prices over time. Auto-seeded trending data with
-            market signals for informed procurement decisions.
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🤝</div>
-          <div class="feature-title">RFQ & Bidding</div>
-          <div class="feature-desc">
-            End-to-end Request for Quotation workflows connecting buyers with verified
-            sellers, builders, and masonry contractors.
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🤖</div>
-          <div class="feature-title">AI Assistant</div>
-          <div class="feature-desc">
-            Powered by Groq's LLM, the Bricks AI Assistant answers construction queries,
-            provides material guidance, and assists with project planning in real time.
-          </div>
-        </div>
+        <div class="mat-count">11 materials</div>
       </div>
-    </section>
 
-    <!-- ── AUTH SYSTEM ── -->
-    <section id="auth">
-      <p class="section-label">Authentication</p>
-      <h2 class="section-title">Five user types.<br/>One unified OTP system.</h2>
-      <p class="section-desc">
-        All mobile logins use phone-based OTP via SMS. Email OTP has been removed.
-        WhatsApp login is coming next.
-      </p>
-
-      <div class="features-grid" style="margin-top: 48px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
-
-        <div class="feature-card">
-          <div class="feature-icon">👤</div>
-          <div class="feature-title">User</div>
-          <div class="feature-desc">
-            Phone OTP login &amp; signup. JWT token, 3-day expiry.
-            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/auth/login</code>
-          </div>
+      <div class="mat-cat reveal reveal-delay-4">
+        <div class="mat-cat-title">Doors &amp; Wood</div>
+        <div class="mat-icons">
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/main_door.svg" alt="Door" title="Main Door"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/upvc_window.svg" alt="Window" title="UPVC Window"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/plywood.svg" alt="Plywood" title="Plywood"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/wooden_door.svg" alt="Wood Door" title="Wooden Door"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/hinges.svg" alt="Hinges" title="Hinges"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/mdf_board.svg" alt="MDF" title="MDF Board"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/steel_door.svg" alt="Steel Door" title="Steel Door"/></div>
+          <div class="mat-icon-wrap"><img src="/public/materials/doors_windows_wood/laminate_sheet.svg" alt="Laminate" title="Laminate Sheet"/></div>
         </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">🏪</div>
-          <div class="feature-title">Seller</div>
-          <div class="feature-desc">
-            Phone OTP login. Profile upload via Cloudinary. GST-linked account.
-            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/seller/login</code>
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">🏗️</div>
-          <div class="feature-title">Builder</div>
-          <div class="feature-desc">
-            Phone OTP login. License, project types &amp; geo-location supported.
-            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/builder/login</code>
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">🧱</div>
-          <div class="feature-title">Masonry</div>
-          <div class="feature-desc">
-            Phone OTP login. Specializations, daily rates &amp; geo-radius.
-            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/masonry/login</code>
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">🔐</div>
-          <div class="feature-title">Admin</div>
-          <div class="feature-desc">
-            Email + password login. JWT token with admin role claim.
-            <br/><code style="font-size:11px;color:var(--gold-light)">POST /api/admin/login</code>
-          </div>
-        </div>
-
-        <div class="feature-card" style="border-color: rgba(37,211,102,0.2); background: linear-gradient(135deg, #0F1320, #0A1A0F);">
-          <div class="feature-icon" style="background: rgba(37,211,102,0.08); border-color: rgba(37,211,102,0.2);">💬</div>
-          <div class="feature-title" style="color: #4ADE80;">WhatsApp Login <span style="font-size:11px;font-weight:400;color:#2A5C3A;margin-left:6px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);padding:2px 8px;border-radius:10px;">Coming Soon</span></div>
-          <div class="feature-desc">
-            WhatsApp OTP will replace SMS across all 5 user types — higher delivery
-            rates, richer notifications, and chat-based support flows.
-          </div>
-        </div>
-
+        <div class="mat-count">11 materials</div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- ── DESIGN PALETTES ── -->
-    <section>
-      <p class="section-label">Design System</p>
-      <h2 class="section-title">Curated Indian &amp; International<br/>colour palettes.</h2>
-      <p class="section-desc">
-        Eight hand-crafted Indian design style palettes, each with primary, accent,
-        and neutral colours validated against real paint collections.
-      </p>
+  <div class="divider"></div>
 
-      <div class="palette-grid">
+  <!-- ══ PALETTES ═══════════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="reveal">
+      <div class="section-eyebrow">Design System</div>
+      <h2 class="section-title">8 Indian palettes,<br/><span class="g">paint-accurate colours.</span></h2>
+      <p class="section-sub">Each palette ships with named hex codes, brand-specific paint references, and Vastu-compliant room guidance.</p>
+    </div>
 
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #F5F5F0, #2C2C2C 70%, #4A90D9);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Modern Contemporary</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#F5F5F0;" title="#F5F5F0"></div>
-              <div class="color-dot" style="background:#E8E0D5;" title="#E8E0D5"></div>
-              <div class="color-dot" style="background:#2C2C2C;" title="#2C2C2C"></div>
-              <div class="color-dot" style="background:#4A90D9;" title="#4A90D9"></div>
-              <div class="color-dot" style="background:#E67E22;" title="#E67E22"></div>
-            </div>
+    <div class="palettes-grid">
+
+      <div class="palette-card reveal reveal-delay-1">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#F7F4EF 0%,#E0D6C8 40%,#1C1C1E 80%,#3A74B0 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Modern Contemporary</div>
+          <div class="palette-hint">Cloud White · Greige · Off Black</div>
+          <div class="dots">
+            <div class="dot" style="background:#F7F4EF" title="Cloud White #F7F4EF"></div>
+            <div class="dot" style="background:#E0D6C8" title="Greige #E0D6C8"></div>
+            <div class="dot" style="background:#1C1C1E" title="Off Black #1C1C1E"></div>
+            <div class="dot" style="background:#3A74B0" title="Steel Blue #3A74B0"></div>
+            <div class="dot" style="background:#C4631A" title="Cognac #C4631A"></div>
           </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #8B4513, #DAA520 50%, #6B2737);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Traditional Indian</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#8B4513;" title="#8B4513"></div>
-              <div class="color-dot" style="background:#DAA520;" title="#DAA520"></div>
-              <div class="color-dot" style="background:#6B2737;" title="#6B2737"></div>
-              <div class="color-dot" style="background:#FF6B35;" title="#FF6B35"></div>
-              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #5C3317, #B8860B 50%, #8B0000);"></div>
-          <div class="palette-info">
-            <div class="palette-name">South Indian Classical</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#5C3317;" title="#5C3317"></div>
-              <div class="color-dot" style="background:#B8860B;" title="#B8860B"></div>
-              <div class="color-dot" style="background:#8B0000;" title="#8B0000"></div>
-              <div class="color-dot" style="background:#FF4500;" title="#FF4500"></div>
-              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #2C1810, #8B7355 50%, #556B2F);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Kerala Nalukettu</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#2C1810;" title="#2C1810"></div>
-              <div class="color-dot" style="background:#8B7355;" title="#8B7355"></div>
-              <div class="color-dot" style="background:#556B2F;" title="#556B2F"></div>
-              <div class="color-dot" style="background:#DC143C;" title="#DC143C"></div>
-              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #CC0000, #FF8C00 50%, #FFD700);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Rajasthani Haveli</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#CC0000;" title="#CC0000"></div>
-              <div class="color-dot" style="background:#FF8C00;" title="#FF8C00"></div>
-              <div class="color-dot" style="background:#006400;" title="#006400"></div>
-              <div class="color-dot" style="background:#FFD700;" title="#FFD700"></div>
-              <div class="color-dot" style="background:#9932CC;" title="#9932CC"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #FFFFFF, #4CAF50 50%, #2196F3);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Vastu-Compliant Modern</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#F5F5F0;" title="#F5F5F0"></div>
-              <div class="color-dot" style="background:#4A3728;" title="#4A3728"></div>
-              <div class="color-dot" style="background:#FF6B2B;" title="#FF6B2B"></div>
-              <div class="color-dot" style="background:#4CAF50;" title="#4CAF50"></div>
-              <div class="color-dot" style="background:#2196F3;" title="#2196F3"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #FFFFFF, #2B2B2B 50%, #E74C3C);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Urban Contemporary</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#FFFFFF; border:1px solid #333;" title="#FFFFFF"></div>
-              <div class="color-dot" style="background:#2B2B2B;" title="#2B2B2B"></div>
-              <div class="color-dot" style="background:#E74C3C;" title="#E74C3C"></div>
-              <div class="color-dot" style="background:#3498DB;" title="#3498DB"></div>
-              <div class="color-dot" style="background:#F39C12;" title="#F39C12"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="palette-card">
-          <div class="palette-swatch" style="background: linear-gradient(135deg, #F5F0EB, #E8A87C 50%, #4A4A4A);"></div>
-          <div class="palette-info">
-            <div class="palette-name">Scandi-Indian Fusion</div>
-            <div class="palette-dots">
-              <div class="color-dot" style="background:#F5F0EB;" title="#F5F0EB"></div>
-              <div class="color-dot" style="background:#4A4A4A;" title="#4A4A4A"></div>
-              <div class="color-dot" style="background:#E8A87C;" title="#E8A87C"></div>
-              <div class="color-dot" style="background:#8B7355;" title="#8B7355"></div>
-              <div class="color-dot" style="background:#4CAF50;" title="#4CAF50"></div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ── ENDPOINTS ── -->
-    <section>
-      <p class="section-label">REST API</p>
-      <h2 class="section-title">Clean, secure,<br/>rate-limited endpoints.</h2>
-      <p class="section-desc">
-        All routes prefixed with <code style="background:var(--surface-2);padding:2px 8px;border-radius:4px;color:var(--gold-light);font-size:14px;">/api</code>.
-        Authentication via JWT. Rate-limited at 200 req/15min.
-      </p>
-
-      <div class="endpoints-grid">
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/login</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/sign-up</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/auth/login/otp-verify</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/seller/login</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/seller/login/otp-verify</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/builder/login</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/builder/login/otp-verify</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/masonry/login</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/masonry/login/otp-verify</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/admin/login</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/home-design/styles</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/design-gen/generate</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/ai/query</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/boq/estimate</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/rfq/create</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/price-trends/history</span></div>
-        <div class="endpoint-chip"><span class="method post">POST</span><span class="endpoint-path">/bid/submit</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/product/list</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/reviews/product/:id</span></div>
-        <div class="endpoint-chip"><span class="method get">GET</span><span class="endpoint-path">/timelines/project/:id</span></div>
-      </div>
-    </section>
-
-    <!-- ── VERSION BANNER ── -->
-    <section style="padding-top: 0; padding-bottom: 80px;">
-      <div class="version-banner">
-        <div class="version-info">
-          <h3>Bricks Agent API <span style="color: var(--gold);">v2.0.0</span></h3>
-          <p>Node.js 18 · Express · MongoDB · Groq AI · Replicate · Cloudinary · Razorpay · Firebase</p>
-        </div>
-        <div class="version-badges">
-          <span class="badge badge-green">● Live</span>
-          <span class="badge badge-gold">v2.0.0 Stable</span>
-          <span class="badge badge-blue">Node 18+</span>
         </div>
       </div>
-    </section>
 
+      <div class="palette-card reveal reveal-delay-2">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#7D3C0F 0%,#C49A22 50%,#5E1D2E 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Traditional Indian</div>
+          <div class="palette-hint">Burnt Sienna · Antique Gold · Crimson Maroon</div>
+          <div class="dots">
+            <div class="dot" style="background:#7D3C0F" title="Burnt Sienna #7D3C0F"></div>
+            <div class="dot" style="background:#C49A22" title="Antique Gold #C49A22"></div>
+            <div class="dot" style="background:#5E1D2E" title="Crimson Maroon #5E1D2E"></div>
+            <div class="dot" style="background:#E8593A" title="Saffron Coral #E8593A"></div>
+            <div class="dot" style="background:#D4AF37" title="Temple Gold #D4AF37"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-3">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#4A2610 0%,#9B6B0A 50%,#720000 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">South Indian Classical</div>
+          <div class="palette-hint">Dark Teak · Antique Brass · Temple Red</div>
+          <div class="dots">
+            <div class="dot" style="background:#4A2610" title="Dark Teak #4A2610"></div>
+            <div class="dot" style="background:#9B6B0A" title="Antique Brass #9B6B0A"></div>
+            <div class="dot" style="background:#720000" title="Temple Red #720000"></div>
+            <div class="dot" style="background:#CF4020" title="Kumkum #CF4020"></div>
+            <div class="dot" style="background:#D4AF37" title="Brass Gold #D4AF37"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-4">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#1E0F06 0%,#7A6045 50%,#3D5219 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Kerala Nalukettu</div>
+          <div class="palette-hint">Jackwood · Coir Tan · Palm Green</div>
+          <div class="dots">
+            <div class="dot" style="background:#1E0F06" title="Jackwood #1E0F06"></div>
+            <div class="dot" style="background:#7A6045" title="Coir Tan #7A6045"></div>
+            <div class="dot" style="background:#3D5219" title="Palm Green #3D5219"></div>
+            <div class="dot" style="background:#B01030" title="Kasavu Red #B01030"></div>
+            <div class="dot" style="background:#D4AF37" title="Temple Gold #D4AF37"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-1">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#B50000 0%,#E07010 40%,#008BA8 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Rajasthani Haveli</div>
+          <div class="palette-hint">Royal Crimson · Saffron Amber · Peacock Teal</div>
+          <div class="dots">
+            <div class="dot" style="background:#B50000" title="Royal Crimson #B50000"></div>
+            <div class="dot" style="background:#E07010" title="Saffron Amber #E07010"></div>
+            <div class="dot" style="background:#004D2A" title="Haveli Green #004D2A"></div>
+            <div class="dot" style="background:#C9A800" title="Temple Gold #C9A800"></div>
+            <div class="dot" style="background:#008BA8" title="Peacock Teal #008BA8"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-2">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#F5F2EB 0%,#3E9957 50%,#1A72BA 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Vastu-Compliant Modern</div>
+          <div class="palette-hint">Cream · Growth Green · Water Blue</div>
+          <div class="dots">
+            <div class="dot" style="background:#F5F2EB;border-color:rgba(255,255,255,0.2)" title="Vastu Cream #F5F2EB"></div>
+            <div class="dot" style="background:#E0DAC8" title="Linen #E0DAC8"></div>
+            <div class="dot" style="background:#3E9957" title="Growth Green #3E9957"></div>
+            <div class="dot" style="background:#E05A15" title="Energy Orange #E05A15"></div>
+            <div class="dot" style="background:#1A72BA" title="Water Blue #1A72BA"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-3">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#FAFAFA 0%,#242424 50%,#D32F2F 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Urban Contemporary</div>
+          <div class="palette-hint">Bright White · Charcoal · Cobalt & Amber</div>
+          <div class="dots">
+            <div class="dot" style="background:#FAFAFA;border-color:rgba(255,255,255,0.2)" title="Bright White #FAFAFA"></div>
+            <div class="dot" style="background:#242424" title="Charcoal #242424"></div>
+            <div class="dot" style="background:#D32F2F" title="Bold Red #D32F2F"></div>
+            <div class="dot" style="background:#1E6DB5" title="Cobalt Blue #1E6DB5"></div>
+            <div class="dot" style="background:#E59A00" title="Amber #E59A00"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-card reveal reveal-delay-4">
+        <div class="palette-swatch" style="background:linear-gradient(135deg,#FEFCFA 0%,#D49060 50%,#404040 100%)"></div>
+        <div class="palette-body">
+          <div class="palette-name">Scandi-Indian Fusion</div>
+          <div class="palette-hint">Snow White · Warm Sand · Dark Charcoal</div>
+          <div class="dots">
+            <div class="dot" style="background:#FEFCFA;border-color:rgba(255,255,255,0.2)" title="Snow White #FEFCFA"></div>
+            <div class="dot" style="background:#F2EDE6" title="Linen #F2EDE6"></div>
+            <div class="dot" style="background:#404040" title="Dark Charcoal #404040"></div>
+            <div class="dot" style="background:#D49060" title="Warm Sand #D49060"></div>
+            <div class="dot" style="background:#3E8E4A" title="Sage Green #3E8E4A"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ ENDPOINTS ══════════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="reveal">
+      <div class="section-eyebrow">REST API</div>
+      <h2 class="section-title">Clean, rate-limited,<br/><span class="g">JWT-secured routes.</span></h2>
+      <p class="section-sub">All routes under <code style="background:var(--surface-2);padding:2px 8px;border-radius:5px;color:var(--gold);font-size:13px">/api</code> · 200 req/15min · Auth endpoints 20 req/10min</p>
+    </div>
+
+    <div class="endpoints-grid">
+      <div class="ep reveal reveal-delay-1"><span class="method POST">POST</span><span class="ep-path">/auth/login</span></div>
+      <div class="ep reveal reveal-delay-1"><span class="method POST">POST</span><span class="ep-path">/auth/sign-up</span></div>
+      <div class="ep reveal reveal-delay-2"><span class="method POST">POST</span><span class="ep-path">/auth/login/otp-verify</span></div>
+      <div class="ep reveal reveal-delay-2"><span class="method POST">POST</span><span class="ep-path">/seller/login</span></div>
+      <div class="ep reveal reveal-delay-3"><span class="method POST">POST</span><span class="ep-path">/seller/login/otp-verify</span></div>
+      <div class="ep reveal reveal-delay-3"><span class="method POST">POST</span><span class="ep-path">/builder/login</span></div>
+      <div class="ep reveal reveal-delay-4"><span class="method POST">POST</span><span class="ep-path">/builder/login/otp-verify</span></div>
+      <div class="ep reveal reveal-delay-4"><span class="method POST">POST</span><span class="ep-path">/masonry/login</span></div>
+      <div class="ep reveal reveal-delay-5"><span class="method POST">POST</span><span class="ep-path">/masonry/login/otp-verify</span></div>
+      <div class="ep reveal reveal-delay-5"><span class="method POST">POST</span><span class="ep-path">/admin/login</span></div>
+      <div class="ep reveal reveal-delay-1"><span class="method GET">GET</span><span class="ep-path">/home-design/styles</span></div>
+      <div class="ep reveal reveal-delay-2"><span class="method POST">POST</span><span class="ep-path">/design-gen/generate</span></div>
+      <div class="ep reveal reveal-delay-3"><span class="method POST">POST</span><span class="ep-path">/ai/query</span></div>
+      <div class="ep reveal reveal-delay-4"><span class="method POST">POST</span><span class="ep-path">/boq/estimate</span></div>
+      <div class="ep reveal reveal-delay-5"><span class="method GET">GET</span><span class="ep-path">/product/list</span></div>
+      <div class="ep reveal reveal-delay-1"><span class="method GET">GET</span><span class="ep-path">/category/all</span></div>
+      <div class="ep reveal reveal-delay-2"><span class="method POST">POST</span><span class="ep-path">/rfq/create</span></div>
+      <div class="ep reveal reveal-delay-3"><span class="method POST">POST</span><span class="ep-path">/bid/submit</span></div>
+      <div class="ep reveal reveal-delay-4"><span class="method GET">GET</span><span class="ep-path">/price-trends/history</span></div>
+      <div class="ep reveal reveal-delay-5"><span class="method GET">GET</span><span class="ep-path">/timelines/project/:id</span></div>
+      <div class="ep reveal reveal-delay-1"><span class="method GET">GET</span><span class="ep-path">/reviews/product/:id</span></div>
+      <div class="ep reveal reveal-delay-2"><span class="method GET">GET</span><span class="ep-path">/masonry/nearby</span></div>
+      <div class="ep reveal reveal-delay-3"><span class="method GET">GET</span><span class="ep-path">/builder/nearby</span></div>
+      <div class="ep reveal reveal-delay-4"><span class="method GET">GET</span><span class="ep-path">/inventory/items</span></div>
+    </div>
+
+    <div class="stack-banner reveal">
+      <div class="stack-left">
+        <h3>Bricks Agent API <span>v2.0.0</span></h3>
+        <p>Node.js 18 · Express 4 · MongoDB/Mongoose · Groq AI · Replicate · Cloudinary · Razorpay · Firebase · Socket.io</p>
+      </div>
+      <div class="stack-badges">
+        <span class="sbadge green">● Live</span>
+        <span class="sbadge gold">v2.0.0 Stable</span>
+        <span class="sbadge blue">Node 18+</span>
+        <span class="sbadge orange">Serverless Ready</span>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /page -->
+
+<!-- ══ FOOTER ══════════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="footer-logo">
+    <div class="brand-bricks-svg">
+      <div class="b b1"></div><div class="b b2"></div><div class="b b3"></div>
+      <div class="b b4"></div><div class="b b5"></div>
+    </div>
+    <div class="brand-name" style="font-size:15px">
+      <span class="w">Bricks</span><span class="g"> Agent</span>
+    </div>
   </div>
+  <p>Building India's Future, Powered by AI.</p>
+  <p style="margin-top:6px">
+    Support: <a href="mailto:support@bricksagent.com">support@bricksagent.com</a>
+    &nbsp;·&nbsp; © 2025 Bricks Agent
+  </p>
+</footer>
 
-  <!-- ── FOOTER ── -->
-  <footer>
-    <p>© 2025 <span class="footer-brand">Bricks Agent</span> — Building India's Future, Powered by AI.</p>
-  </footer>
+<!-- ══ SCRIPTS ═════════════════════════════════════════════════════════════════ -->
+<script>
+/* ── Particle canvas ─────────────────────────────────────────────────────────── */
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  const GOLD   = 'rgba(212,168,67,';
+  const ORANGE = 'rgba(232,98,42,';
+
+  class Particle {
+    constructor() { this.reset(true); }
+    reset(init) {
+      this.x  = Math.random() * W;
+      this.y  = init ? Math.random() * H : H + 10;
+      this.r  = Math.random() * 1.5 + 0.3;
+      this.sp = Math.random() * 0.4 + 0.1;
+      this.op = Math.random() * 0.4 + 0.05;
+      this.c  = Math.random() > 0.6 ? ORANGE : GOLD;
+      this.vx = (Math.random() - 0.5) * 0.15;
+    }
+    update() {
+      this.y -= this.sp;
+      this.x += this.vx;
+      if (this.y < -10) this.reset(false);
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = this.c + this.op + ')';
+      ctx.fill();
+    }
+  }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: 90 }, () => new Particle());
+    window.addEventListener('resize', resize);
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(tick);
+  }
+
+  init();
+  tick();
+})();
+
+/* ── Scroll reveal ────────────────────────────────────────────────────────────── */
+(function() {
+  const els = document.querySelectorAll('.reveal');
+  const io  = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  els.forEach(el => io.observe(el));
+})();
+
+/* ── Number counters ──────────────────────────────────────────────────────────── */
+(function() {
+  const nums = document.querySelectorAll('.stat-num[data-target]');
+  const io   = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el  = e.target;
+      const end = parseInt(el.dataset.target);
+      let cur   = 0;
+      const dur = 1400;
+      const step = end / (dur / 16);
+      const tick = () => {
+        cur = Math.min(cur + step, end);
+        el.textContent = Math.round(cur) + (el.dataset.target >= 35 ? '+' : '');
+        if (cur < end) requestAnimationFrame(tick);
+        else el.textContent = end + (end >= 35 ? '+' : '');
+      };
+      tick();
+      io.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  nums.forEach(n => io.observe(n));
+})();
+
+/* ── Nav scroll tint ──────────────────────────────────────────────────────────── */
+(function() {
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.style.background = window.scrollY > 60
+      ? 'rgba(6,8,18,0.95)'
+      : 'rgba(6,8,18,0.72)';
+  }, { passive: true });
+})();
+</script>
 
 </body>
 </html>

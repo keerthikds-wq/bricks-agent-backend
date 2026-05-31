@@ -6,297 +6,357 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="supported-color-schemes" content="light dark" />
   <title>Bricks Agent — Verify Your Account</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet" type="text/css" />
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    /* Email client resets */
+    body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+    table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; border-collapse:collapse; }
+    img { -ms-interpolation-mode:bicubic; border:0; display:block; outline:none; text-decoration:none; }
+    body { margin:0!important; padding:0!important; width:100%!important; background-color:#050810; }
 
-    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    /* Outlook MSO hack to force dark BG */
+    #outlook a { padding: 0; }
+    .ReadMsgBody { width: 100%; }
+    .ExternalClass { width: 100%; }
+    .ExternalClass * { line-height: 100%; }
 
-    body {
-      margin: 0 !important;
-      padding: 0 !important;
-      background-color: #080B14;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    .wrapper { background-color: #050810; }
+    .card-wrap { background-color: #0D1426; }
 
-    .wrapper {
-      width: 100%;
-      background-color: #080B14;
-    }
-
-    .container {
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    .logo-text-bricks {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 4px;
-      color: #FFFFFF;
-      text-transform: uppercase;
-    }
-
-    .logo-text-agent {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 4px;
-      color: #C9922A;
-      text-transform: uppercase;
-    }
-
-    .logo-dot {
+    /* Digit box */
+    .digit-box {
       display: inline-block;
-      width: 7px;
-      height: 7px;
-      background: #C9922A;
-      border-radius: 50%;
-      margin: 0 4px;
-      vertical-align: middle;
-    }
-
-    .card {
-      background: linear-gradient(160deg, #111827 0%, #0D1420 100%);
-      border: 1px solid rgba(201, 146, 42, 0.18);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    .hero-bar {
-      height: 4px;
-      background: linear-gradient(90deg, #C9922A 0%, #E8B84B 50%, #C9922A 100%);
-    }
-
-    .greeting {
-      font-size: 26px;
-      font-weight: 700;
-      color: #FFFFFF;
-      line-height: 1.3;
-    }
-
-    .subtitle {
-      font-size: 15px;
-      color: #8A95A8;
-      line-height: 1.7;
-    }
-
-    .otp-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 3px;
-      color: #C9922A;
-      text-transform: uppercase;
-    }
-
-    .otp-container {
-      background: #0A0F1E;
-      border: 1px solid rgba(201, 146, 42, 0.25);
-      border-radius: 12px;
-      padding: 24px 40px;
-    }
-
-    .otp-code {
-      font-size: 48px;
+      background-color: #0A0F20;
+      border: 2px solid #C9922A;
+      border-radius: 10px;
+      padding: 12px 8px;
+      min-width: 44px;
+      text-align: center;
+      font-family: 'Space Grotesk', 'Courier New', monospace;
+      font-size: 36px;
       font-weight: 800;
-      letter-spacing: 14px;
-      color: #FFFFFF;
-      font-family: 'Inter', 'Courier New', monospace;
-    }
-
-    .otp-expiry {
-      font-size: 12px;
-      color: #5A6478;
-      margin-top: 10px;
-    }
-
-    .divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(201, 146, 42, 0.15), transparent);
-    }
-
-    .footer-text {
-      font-size: 12px;
-      color: #4A5568;
-      line-height: 1.7;
-    }
-
-    .footer-link {
-      color: #C9922A;
-      text-decoration: none;
-    }
-
-    .security-badge {
-      display: inline-block;
-      background: rgba(201, 146, 42, 0.08);
-      border: 1px solid rgba(201, 146, 42, 0.2);
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 12px;
-      color: #A0845C;
+      color: #F0C060;
+      letter-spacing: 0;
+      line-height: 1;
     }
 
     @media only screen and (max-width: 600px) {
-      .container { width: 100% !important; }
-      .otp-code { font-size: 38px !important; letter-spacing: 10px !important; }
-      .card { border-radius: 0 !important; }
+      .email-container { width: 100% !important; }
+      .inner-pad { padding: 32px 24px !important; }
+      .digit-box { font-size: 28px !important; min-width: 36px !important; padding: 10px 6px !important; }
     }
   </style>
 </head>
 
-<body>
-  <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 16px;">
-        <table class="container" width="560" cellpadding="0" cellspacing="0" border="0">
+<body style="margin:0;padding:0;background-color:#050810;">
 
-          <!-- ── LOGO ── -->
-          <tr>
-            <td align="center" style="padding-bottom: 32px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <!-- Brick icon inline SVG -->
-                    <table cellpadding="0" cellspacing="0" border="0" align="center">
-                      <tr>
-                        <td align="center" style="padding-bottom: 10px;">
-                          <svg width="40" height="26" viewBox="0 0 40 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="0" y="0" width="17" height="11" rx="2" fill="#C9922A"/>
-                            <rect x="19" y="0" width="21" height="11" rx="2" fill="#E8B84B"/>
-                            <rect x="0" y="13" width="10" height="11" rx="2" fill="#E8B84B"/>
-                            <rect x="12" y="13" width="17" height="11" rx="2" fill="#C9922A"/>
-                            <rect x="31" y="13" width="9" height="11" rx="2" fill="#E8B84B"/>
-                          </svg>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td align="center">
-                          <span class="logo-text-bricks">Bricks</span>
-                          <span style="color: rgba(201,146,42,0.5); font-size: 22px; font-weight: 300; margin: 0 4px;">·</span>
-                          <span class="logo-text-agent">Agent</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+<!--[if mso]>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+  style="background-color:#050810;">
+<tr><td>
+<![endif]-->
 
-          <!-- ── CARD ── -->
-          <tr>
-            <td>
-              <table class="card" width="100%" cellpadding="0" cellspacing="0" border="0">
+<table class="wrapper" role="presentation" border="0" cellpadding="0" cellspacing="0"
+  width="100%" style="background-color:#050810;">
+  <tr>
+    <td align="center" style="padding:48px 16px;">
 
-                <!-- Gold top bar -->
-                <tr>
-                  <td class="hero-bar"></td>
-                </tr>
+      <!-- ── EMAIL CONTAINER ─────────────────────────────────────────────────── -->
+      <table class="email-container" role="presentation" border="0" cellpadding="0"
+        cellspacing="0" width="560" style="max-width:560px; width:100%;">
 
-                <!-- Card body -->
-                <tr>
-                  <td style="padding: 44px 48px 36px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <!-- LOGO -->
+        <tr>
+          <td align="center" style="padding-bottom:28px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Inline SVG brick logo -->
+                <td valign="middle" style="padding-right:10px;">
+                  <svg width="36" height="24" viewBox="0 0 36 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0"  y="0"  width="15" height="10" rx="2" fill="#F0C060"/>
+                    <rect x="17" y="0"  width="19" height="10" rx="2" fill="#C9922A"/>
+                    <rect x="0"  y="14" width="9"  height="10" rx="2" fill="#C9922A"/>
+                    <rect x="11" y="14" width="15" height="10" rx="2" fill="#F0C060"/>
+                    <rect x="28" y="14" width="8"  height="10" rx="2" fill="#A07830"/>
+                  </svg>
+                </td>
+                <!-- Brand name -->
+                <td valign="middle">
+                  <span style="
+                    font-family:'Space Grotesk',Arial,sans-serif;
+                    font-size:20px;
+                    font-weight:800;
+                    letter-spacing:1.5px;
+                    text-transform:uppercase;
+                    color:#FFFFFF;
+                  ">Bricks</span><span style="
+                    font-family:'Space Grotesk',Arial,sans-serif;
+                    font-size:20px;
+                    font-weight:800;
+                    letter-spacing:1.5px;
+                    text-transform:uppercase;
+                    color:#C9922A;
+                  "> Agent</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-                      <!-- Greeting -->
-                      <tr>
-                        <td style="padding-bottom: 16px;">
-                          <p class="greeting" style="margin: 0;">Hello, {{ USER }} 👋</p>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding-bottom: 36px;">
-                          <p class="subtitle" style="margin: 0;">
-                            Your one-time verification code for <strong style="color: #B8956A;">Bricks Agent</strong> is ready.
-                            Use it to complete your login securely.
-                          </p>
-                        </td>
-                      </tr>
+        <!-- CARD -->
+        <tr>
+          <td>
+            <table class="card-wrap" role="presentation" border="0" cellpadding="0"
+              cellspacing="0" width="100%"
+              style="background-color:#0D1426; border-radius:20px; overflow:hidden;
+                     border:1px solid rgba(201,146,42,0.20);">
 
-                      <!-- OTP label -->
-                      <tr>
-                        <td align="center" style="padding-bottom: 14px;">
-                          <span class="otp-label">Your Verification Code</span>
-                        </td>
-                      </tr>
+              <!-- Gold top bar -->
+              <tr>
+                <td style="
+                  height:3px;
+                  background:linear-gradient(90deg,#A07830 0%,#D4A843 30%,#F0C060 50%,#D4A843 70%,#A07830 100%);
+                  border-radius:20px 20px 0 0;
+                "></td>
+              </tr>
 
-                      <!-- OTP box -->
-                      <tr>
-                        <td align="center" style="padding-bottom: 36px;">
-                          <table class="otp-container" cellpadding="0" cellspacing="0" border="0">
-                            <tr>
-                              <td align="center">
-                                <div class="otp-code">{{ OTP }}</div>
-                                <p class="otp-expiry" style="margin: 0;">Expires in 10 minutes</p>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
+              <!-- Body padding -->
+              <tr>
+                <td class="inner-pad" style="padding:48px 52px 42px;">
+                  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
 
-                      <!-- Security notice -->
-                      <tr>
-                        <td align="center" style="padding-bottom: 28px;">
-                          <table cellpadding="0" cellspacing="0" border="0">
-                            <tr>
-                              <td class="security-badge">
-                                🔒 &nbsp;Never share this code with anyone
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
+                    <!-- Hi label -->
+                    <tr>
+                      <td align="center" style="padding-bottom:8px;">
+                        <span style="
+                          font-family:'Inter',Arial,sans-serif;
+                          font-size:11px;
+                          font-weight:600;
+                          letter-spacing:3px;
+                          text-transform:uppercase;
+                          color:#6B7894;
+                        ">Verification Required</span>
+                      </td>
+                    </tr>
 
-                      <!-- Divider -->
-                      <tr>
-                        <td class="divider" style="padding-bottom: 28px;"></td>
-                      </tr>
+                    <!-- Greeting -->
+                    <tr>
+                      <td align="center" style="padding-bottom:28px;">
+                        <p style="
+                          font-family:'Space Grotesk',Arial,sans-serif;
+                          font-size:28px;
+                          font-weight:700;
+                          color:#FFFFFF;
+                          margin:0;
+                          line-height:1.25;
+                        ">Hello, {{ USER }} 👋</p>
+                      </td>
+                    </tr>
 
-                      <!-- Info text -->
-                      <tr>
-                        <td style="padding-top: 28px;">
-                          <p class="subtitle" style="margin: 0; font-size: 13px; color: #5A6478;">
-                            If you didn't request this code, you can safely ignore this email.
-                            Someone may have entered your email by mistake.
-                          </p>
-                        </td>
-                      </tr>
+                    <!-- Body text -->
+                    <tr>
+                      <td align="center" style="padding-bottom:36px;">
+                        <p style="
+                          font-family:'Inter',Arial,sans-serif;
+                          font-size:15px;
+                          color:#8895AA;
+                          margin:0;
+                          line-height:1.8;
+                          max-width:380px;
+                        ">
+                          Use the code below to complete your verification on
+                          <strong style="color:#C9922A; font-weight:600;">Bricks Agent</strong>.
+                          This code expires in <strong style="color:#FFFFFF;font-weight:500;">10 minutes</strong>.
+                        </p>
+                      </td>
+                    </tr>
 
-                    </table>
-                  </td>
-                </tr>
+                    <!-- OTP label -->
+                    <tr>
+                      <td align="center" style="padding-bottom:14px;">
+                        <span style="
+                          font-family:'Inter',Arial,sans-serif;
+                          font-size:10.5px;
+                          font-weight:700;
+                          letter-spacing:3px;
+                          text-transform:uppercase;
+                          color:#C9922A;
+                        ">Your OTP Code</span>
+                      </td>
+                    </tr>
 
-              </table>
-            </td>
-          </tr>
+                    <!-- OTP DIGIT BOXES -->
+                    <tr>
+                      <td align="center" style="padding-bottom:36px;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <!--
+                              Each {{ OTP_D1 }} … {{ OTP_D4 }} is a single digit.
+                              If your mailer sends the whole OTP in one variable ({{ OTP }}),
+                              replace the 4 cells below with a single cell using {{ OTP }}
+                              styled as one large number.
+                            -->
+                            <td style="padding:0 5px;">
+                              <div class="digit-box"
+                                style="display:inline-block;background-color:#0A0F20;border:2px solid #C9922A;
+                                       border-radius:10px;padding:12px 14px;text-align:center;
+                                       font-family:'Space Grotesk','Courier New',monospace;
+                                       font-size:36px;font-weight:800;color:#F0C060;line-height:1;
+                                       min-width:52px;">
+                                {{ OTP_D1 }}
+                              </div>
+                            </td>
+                            <td style="padding:0 5px;">
+                              <div class="digit-box"
+                                style="display:inline-block;background-color:#0A0F20;border:2px solid #C9922A;
+                                       border-radius:10px;padding:12px 14px;text-align:center;
+                                       font-family:'Space Grotesk','Courier New',monospace;
+                                       font-size:36px;font-weight:800;color:#F0C060;line-height:1;
+                                       min-width:52px;">
+                                {{ OTP_D2 }}
+                              </div>
+                            </td>
+                            <td style="padding:0 5px;">
+                              <div class="digit-box"
+                                style="display:inline-block;background-color:#0A0F20;border:2px solid #C9922A;
+                                       border-radius:10px;padding:12px 14px;text-align:center;
+                                       font-family:'Space Grotesk','Courier New',monospace;
+                                       font-size:36px;font-weight:800;color:#F0C060;line-height:1;
+                                       min-width:52px;">
+                                {{ OTP_D3 }}
+                              </div>
+                            </td>
+                            <td style="padding:0 5px;">
+                              <div class="digit-box"
+                                style="display:inline-block;background-color:#0A0F20;border:2px solid #C9922A;
+                                       border-radius:10px;padding:12px 14px;text-align:center;
+                                       font-family:'Space Grotesk','Courier New',monospace;
+                                       font-size:36px;font-weight:800;color:#F0C060;line-height:1;
+                                       min-width:52px;">
+                                {{ OTP_D4 }}
+                              </div>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
 
-          <!-- ── FOOTER ── -->
-          <tr>
-            <td style="padding: 32px 8px 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td align="center" style="padding-bottom: 12px;">
-                    <p class="footer-text" style="margin: 0;">
-                      Need help? &nbsp;<a class="footer-link" href="mailto:support@bricksagent.com">support@bricksagent.com</a>
-                      &nbsp;·&nbsp;
-                      <a class="footer-link" href="#">Help Center</a>
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center">
-                    <p class="footer-text" style="margin: 0; font-size: 11px; color: #2D3748;">
-                      © 2025 Bricks Agent. Building India's Future.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+                    <!-- Fallback single OTP (uncomment if using whole OTP in one var) -->
+                    <!--
+                    <tr>
+                      <td align="center" style="padding-bottom:36px;">
+                        <div style="background-color:#0A0F20;border:2px solid #C9922A;border-radius:14px;
+                             padding:18px 40px;display:inline-block;
+                             font-family:'Space Grotesk','Courier New',monospace;
+                             font-size:44px;font-weight:800;color:#F0C060;letter-spacing:14px;">
+                          {{ OTP }}
+                        </div>
+                      </td>
+                    </tr>
+                    -->
 
-        </table>
-      </td>
-    </tr>
-  </table>
+                    <!-- Security badge -->
+                    <tr>
+                      <td align="center" style="padding-bottom:36px;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="
+                              background-color:rgba(201,146,42,0.07);
+                              border:1px solid rgba(201,146,42,0.20);
+                              border-radius:8px;
+                              padding:10px 20px;
+                            ">
+                              <p style="
+                                font-family:'Inter',Arial,sans-serif;
+                                font-size:12px;
+                                color:#9A7B40;
+                                margin:0;
+                                text-align:center;
+                              ">
+                                🔒 &nbsp; Never share this code with anyone, including Bricks Agent staff.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                      <td style="
+                        height:1px;
+                        background:linear-gradient(90deg,transparent,rgba(201,146,42,0.15),transparent);
+                        padding-bottom:28px;
+                      "></td>
+                    </tr>
+
+                    <!-- Ignore notice -->
+                    <tr>
+                      <td align="center" style="padding-top:28px;">
+                        <p style="
+                          font-family:'Inter',Arial,sans-serif;
+                          font-size:12.5px;
+                          color:#4A5570;
+                          margin:0;
+                          line-height:1.75;
+                          max-width:360px;
+                        ">
+                          Didn't request this code? You can safely ignore this email —
+                          someone may have entered your number by mistake.
+                        </p>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Bottom gold bar -->
+              <tr>
+                <td style="
+                  height:1px;
+                  background:linear-gradient(90deg,transparent,rgba(201,146,42,0.12),transparent);
+                "></td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td align="center" style="padding:28px 8px 0;">
+            <p style="
+              font-family:'Inter',Arial,sans-serif;
+              font-size:12px;
+              color:#3A4460;
+              margin:0 0 6px;
+              line-height:1.8;
+            ">
+              Need help? &nbsp;
+              <a href="mailto:support@bricksagent.com"
+                style="color:#C9922A;text-decoration:none;">support@bricksagent.com</a>
+              &nbsp;·&nbsp;
+              <a href="#" style="color:#C9922A;text-decoration:none;">Help Center</a>
+            </p>
+            <p style="
+              font-family:'Inter',Arial,sans-serif;
+              font-size:11px;
+              color:#242C40;
+              margin:0;
+            ">
+              © 2025 Bricks Agent — Building India's Future.
+            </p>
+          </td>
+        </tr>
+
+      </table><!-- /email-container -->
+
+    </td>
+  </tr>
+</table>
+
+<!--[if mso]></td></tr></table><![endif]-->
+
 </body>
 </html>
