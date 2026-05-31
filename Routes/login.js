@@ -14,8 +14,9 @@ router.post('/otp-verify', otpVerify);
 router.post('/login/otp-verify', otpVerifyLogin);
 
 // Session management — no OTP, no charge
-router.post('/auth/refresh', refreshAccessToken);
-router.post('/auth/logout-device', logoutDevice);
+// Single endpoint handles all user types (user/builder/seller/masonry) via user_type stored in RefreshToken
+router.post('/refresh', refreshAccessToken);
+router.post('/logout-device', logoutDevice);
 
 router.post("/logout", logout);
 module.exports = router;
