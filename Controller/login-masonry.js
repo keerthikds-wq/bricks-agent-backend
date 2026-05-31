@@ -1,9 +1,10 @@
-const { jwt, app, md5 } = require('../config');
+const { app, md5 } = require('../config');
 const Masonry = require('../Model/Masonry');
 const Otp     = require('../Model/Otp');
 const { randomString } = require('../Utils');
 const { sendOtp }     = require('../Utils/sms');
 const cloudinary      = require('../Utils/cloudinary');
+const { issueTokenPair } = require('../Utils/authTokens');
 
 // ── POST /api/masonry/login ───────────────────────────────────────────────────
 const loginMasonry = async (req, res) => {
@@ -69,19 +70,19 @@ const signupMasonry = async (req, res) => {
             profile_url,
         });
 
-        const token = jwt.sign(
-            {
-                id:        contractor._id,
-                phone:     contractor.phone,
-                email:     contractor.email,
-                isMasonry: contractor.isMasonry,
-            },
-            process.env.SECRET,
-            { expiresIn: '3d' }
-        );
+        const { device_id, device_name } = req.body;
+        const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+            userId:     contractor._id,
+            userType:   'masonry',
+            payload:    { id: contractor._id, phone: contractor.phone, email: contractor.email, isMasonry: contractor.isMasonry },
+            deviceId:   device_id,
+            deviceName: device_name,
+        });
 
         return res.status(201).json({
-            status: 201, data: contractor, token,
+            status: 201, data: contractor,
+            token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+            expires_in: expiresIn,
             message: 'Masonry contractor created successfully', error: false,
         });
     } catch (error) {
@@ -92,21 +93,24 @@ const signupMasonry = async (req, res) => {
 
 // ── POST /api/masonry/login/otp-verify ────────────────────────────────────────
 const otpVerifyLogin = async (req, res) => {
-    const { phone, otp } = req.body;
+    const { phone, otp, device_id, device_name } = req.body;
     const MASTER_OTP = '0000';
 
     try {
-        // Master OTP bypass (testing only)
         if (String(otp) === MASTER_OTP) {
             const contractor = await Masonry.findOne({ phone, is_delete: { $ne: 1 } });
             if (contractor) {
                 app.set('data', { user: contractor, uuid: md5(randomString()) });
-                const token = jwt.sign(
-                    { id: contractor._id, phone: contractor.phone, email: contractor.email, isMasonry: contractor.isMasonry },
-                    process.env.SECRET,
-                    { expiresIn: '3d' }
-                );
-                return res.json({ status: 200, data: contractor, token, exist: true, message: 'OTP verified successfully', error: false });
+                const payload = { id: contractor._id, phone: contractor.phone, email: contractor.email, isMasonry: contractor.isMasonry };
+                const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                    userId: contractor._id, userType: 'masonry', payload, deviceId: device_id, deviceName: device_name,
+                });
+                return res.json({
+                    status: 200, data: contractor, exist: true,
+                    token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                    expires_in: expiresIn,
+                    message: 'OTP verified successfully', error: false,
+                });
             }
             return res.json({ status: 200, data: null, exist: false, message: 'OTP verified successfully', error: false });
         }
@@ -124,15 +128,21 @@ const otpVerifyLogin = async (req, res) => {
             return res.status(401).json({ status: 401, data: null, message: 'OTP verification failed', error: true });
         }
 
+        await Otp.updateOne({ _id: o._id }, { is_delete: 1 });
+
         const contractor = await Masonry.findOne({ phone, is_delete: { $ne: 1 } });
         if (contractor) {
             app.set('data', { user: contractor, uuid: md5(randomString()) });
-            const token = jwt.sign(
-                { id: contractor._id, phone: contractor.phone, email: contractor.email, isMasonry: contractor.isMasonry },
-                process.env.SECRET,
-                { expiresIn: '3d' }
-            );
-            return res.json({ status: 200, data: contractor, token, exist: true, message: 'OTP verified successfully', error: false });
+            const payload = { id: contractor._id, phone: contractor.phone, email: contractor.email, isMasonry: contractor.isMasonry };
+            const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                userId: contractor._id, userType: 'masonry', payload, deviceId: device_id, deviceName: device_name,
+            });
+            return res.json({
+                status: 200, data: contractor, exist: true,
+                token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                expires_in: expiresIn,
+                message: 'OTP verified successfully', error: false,
+            });
         }
         return res.json({ status: 200, data: null, exist: false, message: 'OTP verified successfully', error: false });
 

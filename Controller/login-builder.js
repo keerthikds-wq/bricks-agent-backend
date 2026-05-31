@@ -1,9 +1,10 @@
-const { jwt, app, md5 } = require('../config');
+const { app, md5 } = require('../config');
 const Builder = require('../Model/Builder');
 const Otp     = require('../Model/Otp');
 const { randomString } = require('../Utils');
 const { sendOtp }     = require('../Utils/sms');
 const cloudinary      = require('../Utils/cloudinary');
+const { issueTokenPair } = require('../Utils/authTokens');
 
 // ── POST /api/builder/login ───────────────────────────────────────────────────
 const loginBuilder = async (req, res) => {
@@ -71,19 +72,19 @@ const signupBuilder = async (req, res) => {
             profile_url,
         });
 
-        const token = jwt.sign(
-            {
-                id:        builder._id,
-                phone:     builder.phone,
-                email:     builder.email,
-                isBuilder: builder.isBuilder,
-            },
-            process.env.SECRET,
-            { expiresIn: '3d' }
-        );
+        const { device_id, device_name } = req.body;
+        const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+            userId:     builder._id,
+            userType:   'builder',
+            payload:    { id: builder._id, phone: builder.phone, email: builder.email, isBuilder: builder.isBuilder },
+            deviceId:   device_id,
+            deviceName: device_name,
+        });
 
         return res.status(201).json({
-            status: 201, data: builder, token,
+            status: 201, data: builder,
+            token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+            expires_in: expiresIn,
             message: 'Builder created successfully', error: false,
         });
     } catch (error) {
@@ -94,21 +95,24 @@ const signupBuilder = async (req, res) => {
 
 // ── POST /api/builder/login/otp-verify ────────────────────────────────────────
 const otpVerifyLogin = async (req, res) => {
-    const { phone, otp } = req.body;
+    const { phone, otp, device_id, device_name } = req.body;
     const MASTER_OTP = '0000';
 
     try {
-        // Master OTP bypass (testing only)
         if (String(otp) === MASTER_OTP) {
             const builder = await Builder.findOne({ phone, is_delete: { $ne: 1 } });
             if (builder) {
                 app.set('data', { user: builder, uuid: md5(randomString()) });
-                const token = jwt.sign(
-                    { id: builder._id, phone: builder.phone, email: builder.email, isBuilder: builder.isBuilder },
-                    process.env.SECRET,
-                    { expiresIn: '3d' }
-                );
-                return res.json({ status: 200, data: builder, token, exist: true, message: 'OTP verified successfully', error: false });
+                const payload = { id: builder._id, phone: builder.phone, email: builder.email, isBuilder: builder.isBuilder };
+                const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                    userId: builder._id, userType: 'builder', payload, deviceId: device_id, deviceName: device_name,
+                });
+                return res.json({
+                    status: 200, data: builder, exist: true,
+                    token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                    expires_in: expiresIn,
+                    message: 'OTP verified successfully', error: false,
+                });
             }
             return res.json({ status: 200, data: null, exist: false, message: 'OTP verified successfully', error: false });
         }
@@ -126,15 +130,21 @@ const otpVerifyLogin = async (req, res) => {
             return res.status(401).json({ status: 401, data: null, message: 'OTP verification failed', error: true });
         }
 
+        await Otp.updateOne({ _id: o._id }, { is_delete: 1 });
+
         const builder = await Builder.findOne({ phone, is_delete: { $ne: 1 } });
         if (builder) {
             app.set('data', { user: builder, uuid: md5(randomString()) });
-            const token = jwt.sign(
-                { id: builder._id, phone: builder.phone, email: builder.email, isBuilder: builder.isBuilder },
-                process.env.SECRET,
-                { expiresIn: '3d' }
-            );
-            return res.json({ status: 200, data: builder, token, exist: true, message: 'OTP verified successfully', error: false });
+            const payload = { id: builder._id, phone: builder.phone, email: builder.email, isBuilder: builder.isBuilder };
+            const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                userId: builder._id, userType: 'builder', payload, deviceId: device_id, deviceName: device_name,
+            });
+            return res.json({
+                status: 200, data: builder, exist: true,
+                token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                expires_in: expiresIn,
+                message: 'OTP verified successfully', error: false,
+            });
         }
         return res.json({ status: 200, data: null, exist: false, message: 'OTP verified successfully', error: false });
 
