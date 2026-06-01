@@ -69,6 +69,16 @@ const masonrySchema = new Schema(
             enum: [0, 1],
             default: 0,
         },
+        average_rating: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 5,
+        },
+        review_count: {
+            type: Number,
+            default: 0,
+        },
         language: {
             type: String,
             enum: ['en', 'hi', 'te', 'ta', 'kn', 'mr', 'gu'],

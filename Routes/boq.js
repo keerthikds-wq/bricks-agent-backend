@@ -20,6 +20,7 @@ router.post("/calculate", ctrl.calculateBOQ);
 // ── Authenticated routes ────────────────────────────────────────────────────
 router.post("/save",              Auth, ctrl.saveBOQ);
 router.get("/my",                 Auth, ctrl.myBOQs);
+router.get("/:id/share",          Auth, ctrl.shareBOQ);   // WhatsApp share + deep link
 router.get("/:id",                Auth, ctrl.getBOQ);
 router.delete("/:id",             Auth, ctrl.deleteBOQ);
 router.post("/upload-plan",       Auth, upload.single("plan"), ctrl.uploadPlan);
