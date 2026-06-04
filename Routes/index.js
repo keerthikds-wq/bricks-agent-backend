@@ -37,5 +37,6 @@ router.use('/prof-notifications',  require("./professional_notification"));
 router.use('/ai',                  require("./ai_assistant"));
 router.use('/home-design',         require("./home_design"));
 router.use('/design-gen',          require("./design_generation"));
+router.use('/floor-render',        require("./floor_plan_render"));
 
 module.exports = router;
