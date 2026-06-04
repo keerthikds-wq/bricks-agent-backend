@@ -1,10 +1,10 @@
-const { jwt, sg_mail, md5, fs, path, app } = require('../config');
+const { sg_mail, md5, fs, path, app } = require('../config');
 const Seller = require("../Model/Seller");
 const Otp = require('../Model/Otp');
 const { randomString } = require('../Utils');
-const axios = require('axios');
 const { sendOtp } = require("../Utils/sms");
 const cloudinary = require("../Utils/cloudinary");
+const { issueTokenPair } = require('../Utils/authTokens');
 
 const loginSeller = async (req, res, next) => {
     const { phone } = req.body;
@@ -43,13 +43,20 @@ const signupSeller = async (req, res, next) => {
             address: req.body.address,
         });
         const seller = await data.save();
-        const token = jwt.sign({
-            id: seller._id,
-            email: seller.email,
-            phone: seller.phone,
-            isSeller: seller.isSeller,
-        }, process.env.SECRET, { expiresIn: "3d" });
-        return res.send({ "status": 200, "data": seller, token, "message": "Seller created successfully", "error": false });
+        const { device_id, device_name } = req.body;
+        const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+            userId:     seller._id,
+            userType:   'seller',
+            payload:    { id: seller._id, email: seller.email, phone: seller.phone, isSeller: seller.isSeller },
+            deviceId:   device_id,
+            deviceName: device_name,
+        });
+        return res.send({
+            status: 200, data: seller,
+            token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+            expires_in: expiresIn,
+            message: "Seller created successfully", error: false,
+        });
     } catch (error) {
         console.log(error);
         return res.status(401).send({ "status": 401, "data": null, "message": "Something went wrong!", "error": true });
@@ -86,53 +93,59 @@ const emailVerify = async (req, res, next) => {
 };
 
 const otpVerifyLogin = async (req, res, next) => {
-    const { phone, otp } = req.body;
-    // Master OTP bypass for testing — remove before production
+    const { phone, otp, device_id, device_name } = req.body;
     const MASTER_OTP = "0000";
     try {
-        // Allow master OTP to bypass DB lookup entirely
         if (String(otp) === MASTER_OTP) {
             const seller = await Seller.findOne({ phone, is_delete: 0 });
             if (seller) {
                 app.set("data", { user: seller, uuid: md5(randomString()) });
-                const token = jwt.sign({
-                    id: seller._id,
-                    email: seller.email,
-                    phone: seller.phone,
-                    isSeller: seller.isSeller,
-                }, process.env.SECRET, { expiresIn: "3d" });
-                return res.send({ "status": 200, "data": seller, token, "exist": true, "message": "Otp verified successfully", "error": false });
+                const payload = { id: seller._id, email: seller.email, phone: seller.phone, isSeller: seller.isSeller };
+                const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                    userId: seller._id, userType: 'seller', payload, deviceId: device_id, deviceName: device_name,
+                });
+                return res.send({
+                    status: 200, data: seller, exist: true,
+                    token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                    expires_in: expiresIn,
+                    message: "Otp verified successfully", error: false,
+                });
             }
-            return res.send({ "status": 200, "data": null, "exist": false, "message": "Otp verified successfully", "error": false });
+            return res.send({ status: 200, data: null, exist: false, message: "Otp verified successfully", error: false });
         }
 
-        const o = await Otp.findOne({ phone, "is_delete": 0 });
+        const o = await Otp.findOne({ phone, is_delete: 0 });
         if (!o) {
-            return res.status(401).send({ "status": 401, "data": null, "message": "OTP not found or already used. Please request a new OTP.", "error": true });
+            return res.status(401).send({ status: 401, data: null, message: "OTP not found or already used. Please request a new OTP.", error: true });
         }
-        const expiry = new Date(new Date(o.createdAt).getTime() + (5 * 60000));
+        const expiry = new Date(new Date(o.createdAt).getTime() + 5 * 60000);
         if (new Date() > expiry) {
-            return res.send({ "status": 200, "data": null, "message": "Otp timed-out", "error": false });
+            return res.send({ status: 200, data: null, message: "Otp timed-out", error: false });
         }
         if (String(otp) !== String(o.Otp)) {
-            return res.status(401).send({ "status": 401, "data": null, "message": "Otp verification failed", "error": true });
+            return res.status(401).send({ status: 401, data: null, message: "Otp verification failed", error: true });
         }
+
+        await Otp.updateOne({ _id: o._id }, { is_delete: 1 });
 
         const seller = await Seller.findOne({ phone, is_delete: 0 });
         if (seller) {
             app.set("data", { user: seller, uuid: md5(randomString()) });
-            const token = jwt.sign({
-                id: seller._id,
-                email: seller.email,
-                phone: seller.phone,
-                isSeller: seller.isSeller,
-            }, process.env.SECRET, { expiresIn: "3d" });
-            return res.send({ "status": 200, "data": seller, token, "exist": true, "message": "Otp verified successfully", "error": false });
+            const payload = { id: seller._id, email: seller.email, phone: seller.phone, isSeller: seller.isSeller };
+            const { accessToken, refreshToken, expiresIn } = await issueTokenPair({
+                userId: seller._id, userType: 'seller', payload, deviceId: device_id, deviceName: device_name,
+            });
+            return res.send({
+                status: 200, data: seller, exist: true,
+                token: accessToken, access_token: accessToken, refresh_token: refreshToken,
+                expires_in: expiresIn,
+                message: "Otp verified successfully", error: false,
+            });
         }
-        return res.send({ "status": 200, "data": null, "exist": false, "message": "Otp verified successfully", "error": false });
+        return res.send({ status: 200, data: null, exist: false, message: "Otp verified successfully", error: false });
     } catch (error) {
         console.error("seller otpVerifyLogin error:", error.message);
-        return res.status(500).send({ "status": 500, "data": null, "message": error.message, "error": true });
+        return res.status(500).send({ status: 500, data: null, message: error.message, error: true });
     }
 };
 

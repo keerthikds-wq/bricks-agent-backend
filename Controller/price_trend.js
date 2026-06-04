@@ -1,4 +1,46 @@
 const PriceTrend = require('../Model/PriceTrend');
+const axios      = require('axios');
+
+// Seasonal/market context used to enrich alert tips (no API cost)
+const SEASONAL_CONTEXT = {
+    cement:    'Cement prices spike before monsoon (Jun–Sep) and Diwali season',
+    steel:     'Steel tracks global iron ore prices and domestic infrastructure demand',
+    tmt_bars:  'TMT bar prices follow steel scrap rates and power tariffs',
+    bricks:    'Brick prices peak in pre-monsoon construction season (Feb–May)',
+    sand:      'River sand prices rise after monsoon due to mining restrictions',
+    aggregate: 'Aggregate is relatively stable; rises with diesel/transport costs',
+    tiles:     'Tile prices move with import duties and ceramic fuel costs',
+    paint:     'Paint prices track crude oil derivatives and titanium dioxide',
+    plywood:   'Plywood prices depend on timber imports and overseas supply chains',
+};
+
+function alertSignal(pctChange) {
+    if (pctChange >= 5)  return { signal: 'buy_now', urgency: 'high' };
+    if (pctChange >= 2)  return { signal: 'buy_now', urgency: 'medium' };
+    if (pctChange <= -5) return { signal: 'wait',    urgency: 'high' };
+    if (pctChange <= -2) return { signal: 'wait',    urgency: 'medium' };
+    return                      { signal: 'neutral',  urgency: 'low' };
+}
+
+function buildTip(material, label, pctChange, signal, urgency, currentPrice, unit) {
+    const abs = Math.abs(pctChange).toFixed(1);
+    const ctx = SEASONAL_CONTEXT[material];
+    const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN');
+
+    if (signal === 'buy_now' && urgency === 'high') {
+        return `${label} is up ${abs}% in 3 months — strong upward momentum. ${ctx}. Procure now at ${fmt(currentPrice)} ${unit} before prices climb further.`;
+    }
+    if (signal === 'buy_now') {
+        return `${label} rising ${abs}% over 3 months. ${ctx}. Consider buying 1–2 months of stock now to lock current rates.`;
+    }
+    if (signal === 'wait' && urgency === 'high') {
+        return `${label} has fallen ${abs}% in 3 months and is still declining. Wait 2–3 weeks before bulk procurement for better rates.`;
+    }
+    if (signal === 'wait') {
+        return `${label} easing (−${abs}% in 3 months). No urgency — buy closer to your requirement date.`;
+    }
+    return `${label} prices are stable (${abs}% change in 3 months). Buy as per your project schedule at ${fmt(currentPrice)} ${unit}.`;
+}
 
 // ─── Material metadata ─────────────────────────────────────────────────────────
 const MATERIAL_META = {
@@ -204,4 +246,81 @@ exports.getMaterials = async (req, res) => {
     icon:  val.icon,
   }));
   res.status(200).json({ data: list });
+};
+
+// ─── GET /api/price-trends/alerts ────────────────────────────────────────────────
+// Returns buy-now / wait / neutral signal for every tracked material based on
+// the 3-month price trend. Fully computational — zero API cost.
+// Optional: ?materials=cement,steel to filter (default: all)
+exports.getPriceAlerts = async (req, res) => {
+  try {
+    const requested = req.query.materials
+      ? req.query.materials.split(',').filter(m => MATERIAL_META[m])
+      : Object.keys(MATERIAL_META);
+
+    const since = new Date();
+    since.setDate(since.getDate() - 90); // 3-month window
+
+    const alerts = [];
+    let buyCount  = 0;
+    let waitCount = 0;
+
+    for (const material of requested) {
+      const meta   = MATERIAL_META[material];
+      const points = await PriceTrend.find({ material, recorded_at: { $gte: since } })
+        .sort({ recorded_at: 1 })
+        .select('price recorded_at -_id')
+        .lean();
+
+      if (points.length < 2) continue;
+
+      const currentPrice = points[points.length - 1].price;
+      const oldestPrice  = points[0].price;
+      const pctChange    = parseFloat((((currentPrice - oldestPrice) / oldestPrice) * 100).toFixed(1));
+      const { signal, urgency } = alertSignal(pctChange);
+      const tip = buildTip(material, meta.label, pctChange, signal, urgency, currentPrice, meta.unit);
+
+      if (signal === 'buy_now') buyCount++;
+      if (signal === 'wait')    waitCount++;
+
+      alerts.push({
+        material,
+        label:         meta.label,
+        unit:          meta.unit,
+        icon:          meta.icon,
+        current_price: currentPrice,
+        change_3m_pct: pctChange,
+        direction:     pctChange >= 0 ? 'up' : 'down',
+        signal,         // 'buy_now' | 'wait' | 'neutral'
+        urgency,        // 'high' | 'medium' | 'low'
+        tip,
+        chart_data: points.slice(-6).map(p => ({ price: p.price, date: p.recorded_at })),
+      });
+    }
+
+    // Sort: high-urgency buy_now first, then high-urgency wait, then the rest
+    alerts.sort((a, b) => {
+      const rank = { buy_now: 0, wait: 1, neutral: 2 };
+      const urg  = { high: 0, medium: 1, low: 2 };
+      if (rank[a.signal] !== rank[b.signal]) return rank[a.signal] - rank[b.signal];
+      return urg[a.urgency] - urg[b.urgency];
+    });
+
+    // One-line market summary
+    const parts = [];
+    if (buyCount)  parts.push(`${buyCount} material${buyCount > 1 ? 's' : ''} rising — procure soon`);
+    if (waitCount) parts.push(`${waitCount} material${waitCount > 1 ? 's' : ''} falling — hold off`);
+    const summary = parts.length ? parts.join('. ') + '.' : 'All material prices are stable this week.';
+
+    return res.json({
+      status: 200,
+      generated_at: new Date(),
+      summary,
+      alerts,
+      error: false,
+    });
+  } catch (err) {
+    console.error('getPriceAlerts:', err);
+    res.status(500).json({ status: 500, message: 'Server error', error: true });
+  }
 };

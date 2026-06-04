@@ -1,6 +1,55 @@
 const RFQ    = require("../Model/RFQ");
 const BOQ    = require("../Model/BOQ");
 const Seller = require("../Model/Seller");
+const { sendToMany } = require('../Utils/fcm');
+
+// Haversine distance in km between two lat/lng points
+function haversineKm(lat1, lng1, lat2, lng2) {
+    const R   = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a   = Math.sin(dLat / 2) ** 2
+              + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Fire-and-forget: push FCM alerts to sellers near the RFQ delivery point
+async function notifyNearbySellers(rfq) {
+    try {
+        const sellers = await Seller.find(
+            { is_delete: { $ne: 1 }, fcm_token: { $exists: true, $nin: [null, '', 'user_logged_out'] } },
+            'fcm_token latitude longitude pincode'
+        ).lean();
+
+        const DEFAULT_RADIUS_KM = 150;
+        const nearby = sellers.filter(s => {
+            if (rfq.lat && rfq.lat !== 0) {
+                const sLat = parseFloat(s.latitude);
+                const sLng = parseFloat(s.longitude);
+                if (!isNaN(sLat) && sLat !== 0) {
+                    return haversineKm(rfq.lat, rfq.lng, sLat, sLng) <= DEFAULT_RADIUS_KM;
+                }
+            }
+            // Pincode-district fallback: first 3 digits = same district
+            if (rfq.delivery_pincode && s.pincode) {
+                return rfq.delivery_pincode.slice(0, 3) === s.pincode.slice(0, 3);
+            }
+            return true; // no location on either side → notify all
+        });
+
+        const tokens = nearby.map(s => s.fcm_token);
+        if (!tokens.length) return;
+
+        await sendToMany(
+            tokens,
+            '🆕 New Lead Near You',
+            `${rfq.material_name} needed in ${rfq.delivery_location}. Tap to quote.`,
+            { rfq_id: String(rfq._id), rfq_number: rfq.rfq_number || '', type: 'new_rfq' }
+        );
+    } catch (e) {
+        console.error('[RFQ] notifyNearbySellers error (non-fatal):', e.message);
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BUYER / BUILDER / MASON — Create & Manage RFQs
@@ -44,6 +93,9 @@ exports.createRFQ = async (req, res) => {
             boq_id:       boq_id        || null,
             boq_item_name: boq_item_name || "",
         });
+
+        // Notify nearby sellers — fire and forget, never blocks the response
+        notifyNearbySellers(rfq).catch(() => {});
 
         res.status(201).json({ status: 201, message: "RFQ created successfully", data: rfq });
     } catch (err) {
@@ -196,24 +248,83 @@ exports.acceptQuote = async (req, res) => {
 
 /**
  * GET /api/rfq/open
- * Sellers see all open RFQs (paginated, filterable by category).
+ * Geo-matched seller lead feed.
+ * - If seller has lat/lng: RFQs within radius_km (default 150) shown first, sorted by distance.
+ * - If seller has pincode only: same-district (first-3-digit prefix) RFQs shown first.
+ * - National RFQs (no location on either side) always included at the end.
+ * ?category=Structural&radius_km=200&page=1&limit=20
  */
 exports.openRFQs = async (req, res) => {
     try {
-        const { category, page = 1, limit = 20 } = req.query;
-        const filter = { status: "open", is_delete: 0 };
-        if (category) filter.category = { $regex: category, $options: "i" };
+        const { category, page = 1, limit = 20, radius_km = 150 } = req.query;
+        const maxRadius = Math.min(Number(radius_km), 500); // cap at 500 km
 
-        const [rfqs, total] = await Promise.all([
-            RFQ.find(filter)
-                .sort({ createdAt: -1 })
-                .skip((page - 1) * limit)
-                .limit(Number(limit))
-                .select("-quotes"), // sellers see RFQ details but not competitors' quotes
-            RFQ.countDocuments(filter),
-        ]);
+        // Load seller's location profile
+        const seller = await Seller.findById(req.user.id)
+            .select('latitude longitude pincode')
+            .lean();
 
-        res.json({ status: 200, message: "success", data: rfqs, total, page: Number(page) });
+        const sellerLat = parseFloat(seller?.latitude);
+        const sellerLng = parseFloat(seller?.longitude);
+        const hasGeo    = !isNaN(sellerLat) && sellerLat !== 0 && !isNaN(sellerLng);
+        const sellerPin = seller?.pincode || '';
+
+        const filter = { status: { $in: ['open', 'quoted'] }, is_delete: 0 };
+        if (category) filter.category = { $regex: category, $options: 'i' };
+
+        const allRFQs = await RFQ.find(filter)
+            .sort({ createdAt: -1 })
+            .select('-quotes')
+            .lean();
+
+        // Annotate each RFQ with distance / match type
+        const MATCH_RANK = { exact_pincode: 0, nearby: 1, nearby_district: 2, national: 3 };
+
+        for (const rfq of allRFQs) {
+            const rfqLat = rfq.lat;
+            const rfqLng = rfq.lng;
+            const rfqPin = rfq.delivery_pincode || '';
+
+            if (hasGeo && rfqLat && rfqLat !== 0) {
+                const dist = haversineKm(sellerLat, sellerLng, rfqLat, rfqLng);
+                rfq.distance_km  = Math.round(dist);
+                rfq.match_type   = dist <= maxRadius ? 'nearby' : 'national';
+            } else if (sellerPin && rfqPin) {
+                if (rfqPin === sellerPin) {
+                    rfq.distance_km = null;
+                    rfq.match_type  = 'exact_pincode';
+                } else if (rfqPin.slice(0, 3) === sellerPin.slice(0, 3)) {
+                    rfq.distance_km = null;
+                    rfq.match_type  = 'nearby_district';
+                } else {
+                    rfq.match_type = 'national';
+                }
+            } else {
+                rfq.match_type = 'national';
+            }
+        }
+
+        // Sort: nearest / best match first; within same tier, newest first
+        allRFQs.sort((a, b) => {
+            const rankDiff = MATCH_RANK[a.match_type] - MATCH_RANK[b.match_type];
+            if (rankDiff !== 0) return rankDiff;
+            if (a.distance_km != null && b.distance_km != null) return a.distance_km - b.distance_km;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+        const start     = (page - 1) * limit;
+        const paginated = allRFQs.slice(start, start + Number(limit));
+        const nearbyCount = allRFQs.filter(r => r.match_type !== 'national').length;
+
+        res.json({
+            status: 200,
+            message: 'success',
+            data: paginated,
+            total: allRFQs.length,
+            nearby_count: nearbyCount,
+            page: Number(page),
+            geo_matched: hasGeo || !!sellerPin,
+        });
     } catch (err) {
         res.status(500).json({ status: 500, message: err.message, error: true });
     }
