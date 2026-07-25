@@ -29,6 +29,18 @@ const rfqSchema = new Schema(
         owner:          { type: Schema.Types.ObjectId, required: true, refPath: "ownerModel" },
         ownerModel:     { type: String, required: true, enum: ["user", "masonry", "builder"] },
 
+        // ── Project link (builder-centric merge) ─────────────────────────────────
+        project_id:     { type: Schema.Types.ObjectId, ref: "project", default: null, index: true },
+
+        // ── Dispatch scope ───────────────────────────────────────────────────────
+        // "roster" is now the only production path: the RFQ goes to the
+        // builder's own VendorLink list. "open" is retained purely so historical
+        // marketplace RFQs still read correctly — nothing creates them anymore.
+        // See MERGE_PLAN.md §Retired.
+        dispatch_mode:  { type: String, enum: ["roster", "open"], default: "roster" },
+        // Vendors this RFQ was actually sent to (snapshot at send time).
+        sent_to:        [{ type: Schema.Types.ObjectId, ref: "user" }],
+
         // ── RFQ reference number (auto-generated) ────────────────────────────────
         rfq_number:     { type: String, unique: true },
 

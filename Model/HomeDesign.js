@@ -28,6 +28,10 @@ const VastuIssueSchema = new Schema({
 const HomeDesignSchema = new Schema({
     user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 
+    // Project link (builder-centric merge). Optional — a homeowner can still
+    // explore a design before any builder project exists.
+    project_id: { type: Schema.Types.ObjectId, ref: 'project', default: null, index: true },
+
     // ── Project basics ──────────────────────────────────────────────────────────
     project_name: { type: String, required: true, trim: true },
     property_type: {

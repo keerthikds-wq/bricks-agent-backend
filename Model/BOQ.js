@@ -24,6 +24,12 @@ const boqSchema = new Schema(
         owner:          { type: Schema.Types.ObjectId, required: true, refPath: "ownerModel" },
         ownerModel:     { type: String, required: true, enum: ["user", "masonry", "builder"] },
 
+        // ── Project link (builder-centric merge) ───────────────────────────────
+        // Optional: a BOQ can still be a standalone estimate, but attaching it
+        // to a project is what feeds the workflow orchestrator and lets RFQs be
+        // generated straight off the item list.
+        project_id:     { type: Schema.Types.ObjectId, ref: "project", default: null, index: true },
+
         // ── Project details ─────────────────────────────────────────────────────
         project_name:   { type: String, default: "My Project" },
         location:       { type: String, default: "" },
