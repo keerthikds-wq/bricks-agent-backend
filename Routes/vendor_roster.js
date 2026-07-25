@@ -3,8 +3,9 @@ const router  = express.Router();
 
 const ctrl = require("../Controller/vendor_roster");
 const { verifyTokenwithAuthorization } = require("../Middleware");
+const attachRole = require("../Middleware/attachRole");
 
-const Auth = verifyTokenwithAuthorization;
+const Auth = [verifyTokenwithAuthorization, attachRole];
 
 /**
  * Vendor roster — builder-scoped supplier management.

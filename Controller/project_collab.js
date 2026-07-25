@@ -430,6 +430,23 @@ exports.addDailyLog = async (req, res) => {
 
         const author = await authorOf(req);
 
+        // Explicit duplicate check rather than relying only on the unique
+        // index. Mongoose builds indexes in the background, so on a fresh or
+        // restored database the index may not exist yet — and a silently
+        // duplicated log is worse than a clear rejection. The index stays as
+        // the backstop against a genuine race.
+        const existing = await DailyLog.findOne({
+            project_id: req.project._id,
+            log_date:   date,
+            author_id:  author.author_id,
+            is_delete:  0,
+        }).select("_id").lean();
+
+        if (existing) {
+            return fail(res, 409,
+                "You have already posted a log for this date. Edit that one instead.");
+        }
+
         const log = await DailyLog.create({
             project_id: req.project._id,
             log_date:   date,

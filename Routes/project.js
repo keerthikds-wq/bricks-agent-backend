@@ -9,8 +9,11 @@ const ai       = require("../Controller/project_ai");
 const { verifyTokenwithAuthorization } = require("../Middleware");
 const { projectAccess, requireCapability } = require("../Middleware/projectAccess");
 const { requireActivePlan } = require("../Utils/subscription");
+const attachRole = require("../Middleware/attachRole");
 
-const Auth = verifyTokenwithAuthorization;
+// attachRole is not optional: login tokens carry no `role` claim, and every
+// role-shaped response below depends on one. See Middleware/attachRole.js.
+const Auth = [verifyTokenwithAuthorization, attachRole];
 
 /**
  * Project routes — the builder-centric core.

@@ -3,8 +3,9 @@ const router  = express.Router();
 
 const ctrl = require("../Controller/builder_subscription");
 const { verifyTokenwithAuthorization } = require("../Middleware");
+const attachRole = require("../Middleware/attachRole");
 
-const Auth = verifyTokenwithAuthorization;
+const Auth = [verifyTokenwithAuthorization, attachRole];
 
 /** Builder subscription — the only paid product in the merged app. */
 router.get ("/",             Auth, ctrl.mySubscription);

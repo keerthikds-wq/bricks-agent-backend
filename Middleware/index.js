@@ -72,8 +72,27 @@ const builderAuth = (req, res, next) => {
  * `sellerAuth` gate would 403 them out of their own business.
  */
 const vendorAuth = (req, res, next) => {
-    auth(req, res, () => {
-        if (req.user && (req.user.role === 'vendor' || req.user.isSeller)) return next();
+    auth(req, res, async () => {
+        if (!req.user) {
+            return res.status(403).json({ status: 403, message: 'Access denied: suppliers only.', error: true });
+        }
+        // Fast path: legacy seller token, or a token already carrying the role.
+        if (req.user.isSeller || req.user.role === 'vendor') return next();
+
+        // Login tokens do not include a `role` claim, so a merged vendor's
+        // token looks like any other user's. Fall back to the record itself —
+        // without this, genuine suppliers were 403'd out of quoting entirely.
+        try {
+            const User = require('../Model/User');
+            const id = req.user.id || req.user._id;
+            const u = id ? await User.findById(id).select('role').lean() : null;
+            if (u && u.role === 'vendor') {
+                req.user.role = 'vendor';
+                return next();
+            }
+        } catch (e) {
+            console.error('vendorAuth lookup error:', e.message);
+        }
         return res.status(403).json({ status: 403, message: 'Access denied: suppliers only.', error: true });
     });
 };
