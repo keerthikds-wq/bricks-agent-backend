@@ -94,6 +94,35 @@ exports.inviteVendor = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/vendors/invite/:token   — PUBLIC preview, no auth.
+ *
+ * Mirrors the project invite preview so a supplier can see who is adding them
+ * and for what, before being asked to log in. Without this the paste-a-link
+ * flow in the app has nothing to show for vendor invites.
+ */
+exports.vendorInviteInfo = async (req, res) => {
+    try {
+        const payload = invites.decodeInvite(req.params.token, "vendor_invite");
+        const builder = await User.findById(payload.builder_id)
+            .select("name profile")
+            .lean();
+        if (!builder) return fail(res, 404, "That builder account no longer exists");
+
+        return ok(res, {
+            kind:         "vendor",
+            builder_name: builder.name || "",
+            builder_photo: builder.profile || "",
+            supplies:     payload.supplies || [],
+            display_name: payload.display_name || "",
+            role:         "vendor",
+            role_label:   "a material supplier",
+        });
+    } catch (err) {
+        return fail(res, err.status || 500, err.message || "Server error");
+    }
+};
+
 // POST /api/vendors/invite/:token/accept   (authenticated vendor)
 exports.acceptVendorInvite = async (req, res) => {
     try {

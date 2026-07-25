@@ -233,6 +233,21 @@ exports.submitQuote = async (req, res) => {
         const rfq = await RFQ.findOne({ _id: req.params.id, status: "open", is_delete: 0 });
         if (!rfq) return res.status(404).json({ status: 404, message: "RFQ not found or already closed", error: true });
 
+        // Roster RFQs are private to the builder's own suppliers. Without this
+        // check any vendor could quote on any roster RFQ just by knowing its
+        // id, which defeats the point of retiring the open marketplace.
+        // Legacy `open` RFQs keep the old behaviour so historical rows still work.
+        if (rfq.dispatch_mode === "roster") {
+            const invited = (rfq.sent_to || []).some(id => id.toString() === req.user.id);
+            if (!invited) {
+                return res.status(403).json({
+                    status: 403,
+                    message: "This request was not sent to you.",
+                    error: true,
+                });
+            }
+        }
+
         // Check if seller already quoted
         const already = rfq.quotes.find(q => q.seller.toString() === req.user.id);
         if (already) {

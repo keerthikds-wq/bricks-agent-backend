@@ -11,6 +11,9 @@ const Auth = verifyTokenwithAuthorization;
  * Replaces the open marketplace seller discovery.
  */
 
+// Public — invite preview shown before login. Must precede the auth'd routes.
+router.get ("/invite/:token",                  ctrl.vendorInviteInfo);
+
 // Vendor-side
 router.get ("/my-requests",              Auth, ctrl.myRequests);
 router.post("/invite/:token/accept",     Auth, ctrl.acceptVendorInvite);

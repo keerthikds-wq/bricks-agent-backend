@@ -62,6 +62,22 @@ const builderAuth = (req, res, next) => {
     });
 };
 
+/**
+ * Requires the caller to be a material supplier.
+ *
+ * Accepts BOTH the merged role (`role === 'vendor'`) and the legacy
+ * `isSeller` flag. Without this, a Seller migrated to a `user` row by
+ * Utils/migrations/001_builder_centric.js could no longer quote on RFQs —
+ * their new token carries `role: 'vendor'` but not `isSeller`, so the old
+ * `sellerAuth` gate would 403 them out of their own business.
+ */
+const vendorAuth = (req, res, next) => {
+    auth(req, res, () => {
+        if (req.user && (req.user.role === 'vendor' || req.user.isSeller)) return next();
+        return res.status(403).json({ status: 403, message: 'Access denied: suppliers only.', error: true });
+    });
+};
+
 /** Allows any authenticated role (including masonry and builder) */
 const verifyTokenwithAuthorization = (req, res, next) => {
     auth(req, res, () => {
@@ -72,4 +88,4 @@ const verifyTokenwithAuthorization = (req, res, next) => {
     });
 };
 
-module.exports = { Auth, auth, adminAuth, sellerAuth, userAuth, masonryAuth, builderAuth, verifyTokenwithAuthorization };
+module.exports = { Auth, auth, adminAuth, sellerAuth, vendorAuth, userAuth, masonryAuth, builderAuth, verifyTokenwithAuthorization };
