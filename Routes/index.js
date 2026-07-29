@@ -2,6 +2,39 @@ const { express, app } = require('../config');
 
 const router = express.Router();
 
+/**
+ * Retired auth silos.
+ *
+ * The app is builder-centric now: one account collection, one OTP login, and a
+ * `role` (builder | client | field_staff | vendor) that decides what you see.
+ * The separate seller / builder / masonry logins are what made the same person
+ * need three accounts, and what caused the masonry lockout fixed in 8abda8d.
+ *
+ * These are answered rather than deleted: installs already on phones still
+ * call them, and a 404 would read as "server broken" instead of "please
+ * update". Mounted BEFORE the legacy routers so they win the match.
+ *
+ * Everything else on those routers (profiles, inventory, premium) is untouched
+ * — only the login doors are closed.
+ */
+const authRetired = (req, res) =>
+    res.status(410).send({
+        status: 410,
+        error: true,
+        moved_to: '/api/auth/login',
+        message:
+            'Separate logins have been replaced by a single Bricks Agent account. ' +
+            'Please update the app and sign in with your phone number.',
+    });
+
+for (const p of [
+    '/seller/login', '/seller/login/otp-verify',
+    '/builder/login', '/builder/login/otp-verify',
+    '/masonry/login', '/masonry/login/otp-verify',
+]) {
+    router.post(p, authRetired);
+}
+
 router.use('/auth', require("./login"));
 router.use('/admin', require("./login-admin"));
 router.use('/seller', require("./login-seller"));

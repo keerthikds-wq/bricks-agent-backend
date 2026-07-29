@@ -254,7 +254,47 @@ function check(name, cond, detail = '') {
   check('non-roster user cannot quote on roster RFQ',
     r.status === 403, `got ${r.status} ← the hole I closed`);
 
-  console.log('\n─── 10. Notifications ────────────────────────────────');
+  console.log('\n─── 10. Unified auth (legacy silos retired) ──────────');
+
+  r = await api.post('/api/auth/register').send({
+    name: 'New Builder', phone: '9000000009', pincode: '500009', role: 'builder',
+  });
+  check('builder can self-register', r.status === 200, `got ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
+  check('registration returns a token', !!r.body?.token, 'no token');
+  check('new builder starts on trial',
+    r.body?.data?.plan === 'trial' && !!r.body?.data?.trial_started_at,
+    `plan=${r.body?.data?.plan} trial_started=${r.body?.data?.trial_started_at}`);
+
+  r = await api.post('/api/auth/register').send({
+    name: 'Dup', phone: '9000000009', pincode: '500009', role: 'client',
+  });
+  check('duplicate phone rejected with a clear message', r.status === 409, `got ${r.status}`);
+
+  r = await api.post('/api/auth/register').send({
+    name: 'Sneaky', phone: '9000000010', pincode: '500010', role: 'field_staff',
+  });
+  check('cannot self-declare as field_staff (invite only)', r.status === 400, `got ${r.status}`);
+
+  // A builder entered this phone on a project before the owner ever signed up.
+  const preProject = await Project.create({
+    builder_id: builder._id, name: 'Pre-linked Villa',
+    client_phone: '9000000011', status: 'planning',
+  });
+  r = await api.post('/api/auth/register').send({
+    name: 'Late Owner', phone: '9000000011', pincode: '500011', role: 'client',
+  });
+  check('client self-register backfills a pre-linked project', r.status === 200, `got ${r.status}`);
+  const linked = await Project.findById(preProject._id);
+  check('pre-linked project now points at the new owner',
+    linked?.client_id?.toString() === r.body?.data?._id,
+    `client_id=${linked?.client_id} user=${r.body?.data?._id}`);
+
+  for (const p of ['/api/seller/login', '/api/builder/login', '/api/masonry/login']) {
+    const rr = await api.post(p).send({ phone: '9000000001' });
+    check(`${p} is retired (410)`, rr.status === 410, `got ${rr.status}`);
+  }
+
+  console.log('\n─── 11. Notifications ────────────────────────────────');
 
   r = await api.get('/api/project-notifications').set(auth(T.client));
   check('owner has notifications from project activity',

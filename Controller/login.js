@@ -55,6 +55,132 @@ const signupUser = async (req, res, next) => {
     }
 };
 
+/**
+ * Unified registration — the single way an account is created.
+ *
+ * Replaces the four separate signup flows (user / seller / builder / masonry).
+ * A person now picks what they are once, and everything else follows from
+ * `role`:
+ *
+ *   builder      self-registers; the only paying role
+ *   client       self-registers, or is auto-linked when a builder enters their
+ *                phone on a project
+ *   field_staff  normally arrives through a builder's invite; accepting one
+ *                promotes the account (see projects.acceptInvite)
+ *   vendor       arrives through a builder's vendor invite
+ *
+ * Only builder and client may be chosen here. Letting someone self-declare as
+ * field staff would create site accounts attached to no builder, which is
+ * exactly the orphaned-role mess this merge exists to remove.
+ *
+ * Unlike the old signupUser this does NOT require a profile image — demanding
+ * a photo upload before a builder can even see the product cost signups for no
+ * benefit.
+ */
+const registerUser = async (req, res, next) => {
+    try {
+        const { name, phone, email, pincode, role, longitude, latitude } = req.body;
+
+        if (!name || !phone) {
+            return res.status(400).send({
+                status: 400, data: null, error: true,
+                message: "Name and phone number are required",
+            });
+        }
+        if (!['builder', 'client'].includes(role)) {
+            return res.status(400).send({
+                status: 400, data: null, error: true,
+                message: "Choose whether you are a builder or a home owner",
+            });
+        }
+
+        const existing = await User.findOne({ phone });
+        if (existing) {
+            // Idempotent-ish: a returning user who hits register instead of
+            // login should be told plainly, not handed a duplicate-key stack.
+            return res.status(409).send({
+                status: 409, data: null, error: true,
+                message: "An account already exists for this number. Please log in.",
+            });
+        }
+
+        // Profile image is optional. multer gives us req.file only when sent.
+        let profile;
+        if (req.file && req.file.path) {
+            try {
+                const up = await cloudinary.uploader.upload(req.file.path);
+                profile = up.secure_url;
+            } catch (e) {
+                console.error('register: profile upload failed (non-fatal):', e.message);
+            }
+        }
+
+        const user = await User.create({
+            name,
+            phone,
+            email: email || undefined,
+            pincode: pincode || '000000',
+            profile,
+            role,
+            longitude: longitude ? String(longitude) : undefined,
+            latitude: latitude ? String(latitude) : undefined,
+            // Builders start their free trial the moment they sign up — the
+            // paywall reads this, so it must be set at creation.
+            ...(role === 'builder'
+                ? { plan: 'trial', trial_started_at: new Date() }
+                : {}),
+        });
+
+        // Pre-linked by a builder before they signed up? Attach them now so the
+        // project is waiting on first open rather than needing an invite.
+        if (role === 'client') {
+            try {
+                const Project = require('../Model/Project');
+                const ProjectMember = require('../Model/ProjectMember');
+                const pending = await Project.find({
+                    client_phone: phone, client_id: null, is_delete: 0,
+                }).select('_id builder_id');
+
+                for (const p of pending) {
+                    await Project.updateOne({ _id: p._id }, { $set: { client_id: user._id } });
+                    await ProjectMember.updateOne(
+                        { project_id: p._id, user_id: user._id, role: 'client' },
+                        {
+                            $set: {
+                                ...ProjectMember.defaultCapabilities('client'),
+                                status: 'active',
+                                invited_by: p.builder_id,
+                                accepted_at: new Date(),
+                            },
+                        },
+                        { upsert: true }
+                    );
+                }
+            } catch (e) {
+                console.error('register: client backfill failed (non-fatal):', e.message);
+            }
+        }
+
+        const token = jwt.sign(
+            { id: user._id, email: user.email, phone: user.phone, isUser: true },
+            process.env.SECRET,
+            { expiresIn: "3d" }
+        );
+
+        return res.send({
+            status: 200, error: false,
+            data: user, token,
+            message: "Account created successfully",
+        });
+    } catch (error) {
+        console.error("registerUser error:", error.message);
+        return res.status(500).send({
+            status: 500, data: null, error: true,
+            message: "Could not create your account. Please try again.",
+        });
+    }
+};
+
 const emailVerify = async (req, res, next) => {
     const { email } = req.body;
     try {
@@ -86,11 +212,19 @@ const emailVerify = async (req, res, next) => {
 
 const otpVerifyLogin = async (req, res, next) => {
     const { phone, otp } = req.body;
-    // Master OTP bypass for testing — remove before production
-    const MASTER_OTP = "0000";
+
+    // Master OTP bypass.
+    //
+    // This was hardcoded to "0000" with a "remove before production" comment,
+    // which means ANY phone number could be logged into by anyone who knew it —
+    // a full account-takeover backdoor sitting in the live build. It is now
+    // opt-in via env and refuses to arm itself in production, so the default
+    // deployment has no bypass at all. Set MASTER_OTP locally for testing.
+    const MASTER_OTP =
+        process.env.NODE_ENV === 'production' ? null : (process.env.MASTER_OTP || null);
+
     try {
-        // Allow master OTP to bypass DB lookup entirely
-        if (String(otp) === MASTER_OTP) {
+        if (MASTER_OTP && String(otp) === String(MASTER_OTP)) {
             const user = await User.findOne({ phone, is_delete: 0 });
             if (user) {
                 const token = jwt.sign({
@@ -166,4 +300,4 @@ const logout = (req, res, next) => {
     }
 };
 
-module.exports = { loginUser, signupUser, emailVerify, otpVerify, otpVerifyLogin, logout };
+module.exports = { loginUser, signupUser, registerUser, emailVerify, otpVerify, otpVerifyLogin, logout };
