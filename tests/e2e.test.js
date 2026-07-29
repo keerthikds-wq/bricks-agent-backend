@@ -316,7 +316,56 @@ function check(name, cond, detail = '') {
     check(`${p} is retired (410)`, rr.status === 410, `got ${rr.status}`);
   }
 
-  console.log('\n─── 11. Notifications ────────────────────────────────');
+  console.log('\n─── 11. Materials & rates (never an undated price) ───');
+
+  const PriceTrend = require(path.join(REPO, 'Model/PriceTrend'));
+  const Product = require(path.join(REPO, 'Model/Product'));
+  const days = (n) => new Date(Date.now() - n * 86400000);
+
+  // Own region: index.js runs priceTrendScheduler on boot, which seeds live
+  // 'national' rates and would otherwise mask these fixtures.
+  const REG = 'e2e-region';
+  await PriceTrend.create({ material: 'cement', price: 400, unit: 'per 50kg bag', region: REG, recorded_at: days(2) });
+  await PriceTrend.create({ material: 'cement', price: 380, unit: 'per 50kg bag', region: REG, recorded_at: days(35) });
+  // Steel's newest point is older than the 45-day staleness cutoff.
+  await PriceTrend.create({ material: 'steel', price: 62, unit: 'per kg', region: REG, recorded_at: days(120) });
+
+  r = await api.get(`/api/materials/rates?region=${REG}`).set(auth(T.builder));
+  check('rates load', r.status === 200, `got ${r.status}`);
+  const cement = (r.body?.data?.items || []).find(i => i.material === 'cement');
+  check('fresh rate is returned', !!cement, 'cement missing');
+  check('rate carries the date it was recorded',
+    !!cement?.as_of && cement?.age_days >= 0, `as_of=${cement?.as_of}`);
+  check('trend computed against a ~30-day-old point',
+    cement?.change_pct === 5.3, `got ${cement?.change_pct}`);
+  check('stale material omitted rather than shown old',
+    !(r.body?.data?.items || []).some(i => i.material === 'steel'),
+    'steel was returned despite being 120 days old');
+
+  r = await api.get(`/api/materials/benchmark?material=steel&region=${REG}`).set(auth(T.builder));
+  check('benchmark returns null for stale material, not a guess',
+    r.status === 200 && r.body?.data?.rate === null, `got ${JSON.stringify(r.body?.data)}`);
+
+  await Product.create({ name: 'Plain Cement', is_published: true, material_key: 'cement' });
+  await Product.create({
+    name: 'Sponsored Cement', is_published: true, material_key: 'cement',
+    sponsored: true, sponsor_name: 'BrandCo', sponsor_until: days(-30),
+  });
+  await Product.create({
+    name: 'Expired Sponsorship', is_published: true, material_key: 'cement',
+    sponsored: true, sponsor_name: 'OldCo', sponsor_until: days(5),
+  });
+
+  r = await api.get('/api/materials/products?material=cement').set(auth(T.builder));
+  const names = (r.body?.data || []).map(p => p.name);
+  check('published products load', names.length === 3, `got ${names.length}`);
+  check('live sponsor floats to the top', names[0] === 'Sponsored Cement', `order=${names}`);
+  const expired = (r.body?.data || []).find(p => p.name === 'Expired Sponsorship');
+  check('expired sponsorship stops being paid placement',
+    expired?.sponsored === false && expired?.sponsor_name === '',
+    `sponsored=${expired?.sponsored} name=${expired?.sponsor_name}`);
+
+  console.log('\n─── 12. Notifications ────────────────────────────────');
 
   r = await api.get('/api/project-notifications').set(auth(T.client));
   check('owner has notifications from project activity',

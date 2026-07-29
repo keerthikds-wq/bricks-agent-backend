@@ -74,6 +74,7 @@ router.use('/design-gen',          require("./design_generation"));
 // ── Builder-centric merge (v2) ───────────────────────────────────────────────
 // Projects are the new spine: builders own them, clients / field staff /
 // vendors are linked in. See MERGE_PLAN.md.
+router.use('/materials',             require("./materials"));
 router.use('/projects',              require("./project"));
 router.use('/vendors',               require("./vendor_roster"));
 router.use('/builder-subscription',  require("./builder_subscription"));

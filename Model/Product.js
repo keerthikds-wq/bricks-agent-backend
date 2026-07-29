@@ -31,6 +31,28 @@ const productSchema = new Schema(
         subtitle:{
             type: String,
         },
+        // ── Materials & rates catalogue (builder-centric merge) ──────────────
+        // Products are admin-published reference now, not seller inventory.
+        // Builders do not buy in-app; they buy from their WhatsApp suppliers.
+        is_published: { type: Boolean, default: true, index: true },
+
+        /// Which material this maps to, so a product can be shown against the
+        /// live rate for its category (see PriceTrend.material).
+        material_key: {
+            type: String,
+            enum: ['cement', 'steel', 'bricks', 'sand', 'aggregate', 'tiles',
+                   'paint', 'tmt_bars', 'plywood', null],
+            default: null,
+            index: true,
+        },
+
+        /// Paid placement. Declared now so the data shape is right when
+        /// manufacturers start buying it; nothing renders differently until
+        /// `sponsored` is set, and sponsored items are always labelled.
+        sponsored:     { type: Boolean, default: false, index: true },
+        sponsor_name:  { type: String, default: "" },
+        sponsor_until: { type: Date },
+
         manufacturer:{
             type: String,
         },
