@@ -1,199 +1,101 @@
 const VendorLink = require("../Model/VendorLink");
-const RFQ        = require("../Model/RFQ");
-const User       = require("../Model/User");
-const Inventory  = require("../Model/Inventory");
+const RFQ = require("../Model/RFQ");
+const User = require("../Model/User");
 
-const { callerId }   = require("../Middleware/projectAccess");
-const { notifyUsers } = require("../Utils/projectNotify");
-const invites = require("../Utils/projectInvite");
+const { callerId } = require("../Middleware/projectAccess");
 
-const ok   = (res, data, s = 200) => res.status(s).json({ success: true, data });
-const fail = (res, s, message)    => res.status(s).json({ success: false, message });
+const ok = (res, data, s = 200) => res.status(s).json({ success: true, data });
+const fail = (res, s, message) => res.status(s).json({ success: false, message });
 
 /**
- * Vendor roster — a builder's private supplier list.
+ * Supplier address book, owned by the builder.
  *
- * This replaces the open marketplace: RFQs now go to vendors the builder has
- * onboarded, not broadcast to every seller within a geo radius. The retired
- * behaviour lived in lib/algorithms/send_notification_to_nearby_sellers.dart
- * and Controller/requirement.js — see MERGE_PLAN.md §Retired.
+ * Suppliers do not use the app. The builder keeps their contacts here, creates
+ * a material request, and sends it to the right suppliers over WhatsApp. When
+ * they reply — on WhatsApp, or by phone — the builder records what each of them
+ * quoted so the prices can be compared side by side.
+ *
+ * There is deliberately no vendor login, no invite/accept, and no supplier
+ * inbox. See Model/VendorLink.js.
  */
 
-// GET /api/vendors   (builder)
+/* ────────────────────────────── Contacts ────────────────────────────── */
+
+// GET /api/vendors
 exports.listVendors = async (req, res) => {
     try {
-        const builderId = callerId(req);
-        const q = { builder_id: builderId, status: { $ne: "removed" } };
+        const q = { builder_id: callerId(req), is_delete: 0 };
         if (req.query.supplies) q.supplies = req.query.supplies;
 
-        const links = await VendorLink.find(q)
-            .populate("vendor_id", "name phone profile role")
-            .sort({ preferred: -1, createdAt: -1 })
+        const items = await VendorLink.find(q)
+            .sort({ preferred: -1, name: 1 })
             .lean();
-
-        return ok(res, links);
+        return ok(res, items);
     } catch (err) {
         console.error("listVendors error:", err);
         return fail(res, 500, "Server error");
     }
 };
 
-// POST /api/vendors/invite   (builder) — generate a WhatsApp invite link
-exports.inviteVendor = async (req, res) => {
+// POST /api/vendors   { name, phone, company?, supplies[], notes? }
+exports.addVendor = async (req, res) => {
     try {
+        const { name, phone, company = "", supplies = [], notes = "" } = req.body;
+        if (!name || !phone) return fail(res, 400, "Name and phone number are required");
+
         const builderId = callerId(req);
-        const { phone, display_name = "", supplies = [] } = req.body;
-        if (!phone) return fail(res, 400, "Vendor phone number is required");
 
-        const builder = await User.findById(builderId).select("name").lean();
-
-        // If they already have an account, link immediately — no round-trip.
-        const existing = await User.findOne({ phone, is_delete: 0 });
-        if (existing) {
-            const link = await VendorLink.findOneAndUpdate(
-                { builder_id: builderId, vendor_id: existing._id },
-                {
-                    $set: {
-                        supplies,
-                        display_name: display_name || existing.name,
-                        status: "active",
-                        accepted_at: new Date(),
-                    },
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-
-            await notifyUsers([existing._id], {
-                title: "You've been added as a supplier",
-                body:  `${builder?.name || "A builder"} added you to their vendor list.`,
-                kind:  "invite",
-                route: "/vendor/requests",
-            });
-
-            return ok(res, { linked: true, vendor: link });
-        }
-
-        const token = invites.createVendorInvite({
-            builderId,
-            supplies,
-            displayName: display_name,
-            phone,
+        const existing = await VendorLink.findOne({
+            builder_id: builderId, phone, is_delete: 0,
         });
-        const msg = invites.buildInviteMessage({
-            token,
-            inviterName: builder?.name || "A builder",
-            projectName: "",
-            role: "vendor",
-            isVendor: true,
-        });
+        if (existing) return fail(res, 409, `${existing.name} is already on your list with this number.`);
 
-        return ok(res, { linked: false, token, ...msg });
+        // If they happen to have an account, note it — nothing depends on it,
+        // but it lets us show a verified badge later.
+        const account = await User.findOne({ phone, is_delete: 0 }).select("_id").lean();
+
+        const v = await VendorLink.create({
+            builder_id: builderId,
+            name, phone, company, supplies, notes,
+            user_id: account ? account._id : null,
+        });
+        return ok(res, v, 201);
     } catch (err) {
-        console.error("inviteVendor error:", err);
+        if (err.code === 11000) return fail(res, 409, "That number is already on your supplier list.");
+        console.error("addVendor error:", err);
         return fail(res, 500, "Server error");
     }
 };
 
-/**
- * GET /api/vendors/invite/:token   — PUBLIC preview, no auth.
- *
- * Mirrors the project invite preview so a supplier can see who is adding them
- * and for what, before being asked to log in. Without this the paste-a-link
- * flow in the app has nothing to show for vendor invites.
- */
-exports.vendorInviteInfo = async (req, res) => {
-    try {
-        const payload = invites.decodeInvite(req.params.token, "vendor_invite");
-        const builder = await User.findById(payload.builder_id)
-            .select("name profile")
-            .lean();
-        if (!builder) return fail(res, 404, "That builder account no longer exists");
-
-        return ok(res, {
-            kind:         "vendor",
-            builder_name: builder.name || "",
-            builder_photo: builder.profile || "",
-            supplies:     payload.supplies || [],
-            display_name: payload.display_name || "",
-            role:         "vendor",
-            role_label:   "a material supplier",
-        });
-    } catch (err) {
-        return fail(res, err.status || 500, err.message || "Server error");
-    }
-};
-
-// POST /api/vendors/invite/:token/accept   (authenticated vendor)
-exports.acceptVendorInvite = async (req, res) => {
-    try {
-        const userId  = callerId(req);
-        const payload = invites.decodeInvite(req.params.token, "vendor_invite");
-
-        if (payload.builder_id === String(userId)) {
-            return fail(res, 400, "You cannot add yourself as your own vendor.");
-        }
-
-        const link = await VendorLink.findOneAndUpdate(
-            { builder_id: payload.builder_id, vendor_id: userId },
-            {
-                $set: {
-                    supplies:     payload.supplies || [],
-                    display_name: payload.display_name || "",
-                    status:       "active",
-                    accepted_at:  new Date(),
-                },
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-
-        // Promote the account to vendor if it was still on the default role.
-        await User.updateOne(
-            { _id: userId, role: { $in: ["client", null] } },
-            { $set: { role: "vendor" } }
-        );
-
-        await notifyUsers([payload.builder_id], {
-            title: "Vendor joined",
-            body:  "A supplier accepted your invite.",
-            kind:  "success",
-            route: "/vendors",
-        });
-
-        return ok(res, { joined: true, vendor: link });
-    } catch (err) {
-        return fail(res, err.status || 500, err.message || "Server error");
-    }
-};
-
-// PATCH /api/vendors/:linkId   (builder)
+// PATCH /api/vendors/:id
 exports.updateVendor = async (req, res) => {
     try {
-        const allowed = ["supplies", "display_name", "notes", "preferred", "rating", "status"];
+        const allowed = ["name", "phone", "company", "supplies", "notes", "preferred", "rating"];
         const updates = {};
         for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
 
-        const link = await VendorLink.findOneAndUpdate(
-            { _id: req.params.linkId, builder_id: callerId(req) },
+        const v = await VendorLink.findOneAndUpdate(
+            { _id: req.params.id, builder_id: callerId(req), is_delete: 0 },
             { $set: updates },
             { new: true }
         );
-        if (!link) return fail(res, 404, "Vendor not found on your roster");
-        return ok(res, link);
+        if (!v) return fail(res, 404, "Supplier not found on your list");
+        return ok(res, v);
     } catch (err) {
         console.error("updateVendor error:", err);
         return fail(res, 500, "Server error");
     }
 };
 
-// DELETE /api/vendors/:linkId   (builder)
+// DELETE /api/vendors/:id
 exports.removeVendor = async (req, res) => {
     try {
-        const link = await VendorLink.findOneAndUpdate(
-            { _id: req.params.linkId, builder_id: callerId(req) },
-            { $set: { status: "removed" } },
+        const v = await VendorLink.findOneAndUpdate(
+            { _id: req.params.id, builder_id: callerId(req) },
+            { $set: { is_delete: 1 } },
             { new: true }
         );
-        if (!link) return fail(res, 404, "Vendor not found on your roster");
+        if (!v) return fail(res, 404, "Supplier not found on your list");
         return ok(res, { removed: true });
     } catch (err) {
         console.error("removeVendor error:", err);
@@ -201,52 +103,86 @@ exports.removeVendor = async (req, res) => {
     }
 };
 
+/* ─────────────────────── WhatsApp dispatch ──────────────────────────── */
+
+/** The message a supplier actually receives. Plain text, no links to install. */
+function buildRfqMessage(rfq, builderName) {
+    const lines = [
+        `*Material request*${rfq.rfq_number ? ` — ${rfq.rfq_number}` : ""}`,
+        ``,
+        `*Item:* ${rfq.material_name}`,
+        `*Quantity:* ${rfq.quantity} ${rfq.unit}`,
+    ];
+    if (rfq.specifications) lines.push(`*Spec:* ${rfq.specifications}`);
+    if (rfq.brand_preference) lines.push(`*Brand:* ${rfq.brand_preference}`);
+    if (rfq.delivery_location) lines.push(`*Deliver to:* ${rfq.delivery_location}`);
+    if (rfq.required_by) {
+        lines.push(`*Needed by:* ${new Date(rfq.required_by).toLocaleDateString("en-IN")}`);
+    }
+    lines.push(``, `Please send your best rate and delivery time.`);
+    if (builderName) lines.push(``, `— ${builderName}`);
+    return lines.join("\n");
+}
+
 /**
- * POST /api/vendors/dispatch-rfq/:rfqId   (builder)
- * Send an existing RFQ to the roster vendors who supply that category.
+ * POST /api/vendors/dispatch-rfq/:rfqId
+ *
+ * Does not send anything itself. Returns one ready-to-open wa.me link per
+ * matching supplier — the builder taps through them. Sending server-side would
+ * need a WhatsApp Business account and template approval; opening the app with
+ * the message prefilled is what actually works today.
  */
 exports.dispatchRfq = async (req, res) => {
     try {
         const builderId = callerId(req);
         const rfq = await RFQ.findOne({ _id: req.params.rfqId, is_delete: 0 });
-        if (!rfq) return fail(res, 404, "RFQ not found");
+        if (!rfq) return fail(res, 404, "Request not found");
         if (rfq.owner.toString() !== builderId.toString()) {
-            return fail(res, 403, "This RFQ is not yours");
+            return fail(res, 403, "This request is not yours");
         }
 
-        const q = { builder_id: builderId, status: "active" };
-        // Match on category when the RFQ has one; otherwise send to the roster.
+        const q = { builder_id: builderId, is_delete: 0 };
         if (rfq.category) q.supplies = rfq.category.toLowerCase();
 
-        let links = await VendorLink.find(q).select("vendor_id").lean();
-        if (!links.length) {
-            links = await VendorLink.find({ builder_id: builderId, status: "active" }).select("vendor_id").lean();
+        // Fall back to the whole list when nobody is tagged for this category —
+        // better to offer every supplier than to silently send to none.
+        let vendors = await VendorLink.find(q).lean();
+        let matchedByCategory = vendors.length > 0;
+        if (!vendors.length) {
+            vendors = await VendorLink.find({ builder_id: builderId, is_delete: 0 }).lean();
         }
-        if (!links.length) {
-            return fail(res, 400, "You have no active vendors yet. Add vendors before sending an RFQ.");
+        if (!vendors.length) {
+            return fail(res, 400, "Add suppliers to your list before sending a request.");
         }
 
-        const vendorIds = links.map((l) => l.vendor_id);
+        const builder = await User.findById(builderId).select("name").lean();
+        const message = buildRfqMessage(rfq, builder?.name || "");
 
-        rfq.dispatch_mode = "roster";
-        rfq.sent_to = vendorIds;
-        rfq.status = "open";
-        await rfq.save();
+        const targets = vendors.map((v) => ({
+            id: v._id,
+            name: v.name,
+            phone: v.phone,
+            company: v.company,
+            preferred: v.preferred,
+            // wa.me wants a bare international number.
+            whatsapp_url: `https://wa.me/${String(v.phone).replace(/\D/g, "").replace(/^0+/, "").padStart(12, "91")}?text=${encodeURIComponent(message)}`,
+        }));
 
         await VendorLink.updateMany(
-            { builder_id: builderId, vendor_id: { $in: vendorIds } },
+            { _id: { $in: vendors.map((v) => v._id) } },
             { $inc: { rfqs_sent: 1 } }
         );
 
-        await notifyUsers(vendorIds, {
-            projectId: rfq.project_id || null,
-            title: "New material request",
-            body:  `${rfq.material_name} — ${rfq.quantity} ${rfq.unit}`,
-            kind:  "rfq",
-            route: `/rfq/${rfq._id}`,
-        });
+        rfq.dispatch_mode = "roster";
+        rfq.sent_to_contacts = vendors.map((v) => v._id);
+        rfq.status = "open";
+        await rfq.save();
 
-        return ok(res, { sent_to: vendorIds.length, rfq });
+        return ok(res, {
+            message,
+            matched_by_category: matchedByCategory,
+            targets,
+        });
     } catch (err) {
         console.error("dispatchRfq error:", err);
         return fail(res, 500, "Server error");
@@ -254,51 +190,60 @@ exports.dispatchRfq = async (req, res) => {
 };
 
 /**
- * GET /api/vendors/my-requests   (vendor)
- * RFQs addressed to this vendor by the builders who onboarded them.
+ * POST /api/vendors/:id/record-quote/:rfqId
+ *
+ * The builder types in what a supplier quoted back over WhatsApp, so the
+ * prices can be compared in one place. This replaces the supplier submitting
+ * a quote themselves — they are not in the app.
  */
-exports.myRequests = async (req, res) => {
+exports.recordQuote = async (req, res) => {
     try {
-        const vendorId = callerId(req);
-        const rfqs = await RFQ.find({
-            sent_to: vendorId,
-            is_delete: 0,
-            status: { $in: ["open", "quoted"] },
-        })
-            .sort({ createdAt: -1 })
-            .limit(100)
-            .lean();
+        const builderId = callerId(req);
+        const { unit_price, delivery_days, brand, note } = req.body;
+        if (unit_price === undefined || Number(unit_price) <= 0) {
+            return fail(res, 400, "Enter the rate they quoted");
+        }
 
-        // Hide competitors' pricing — a vendor sees only their own quote.
-        const shaped = rfqs.map((r) => ({
-            ...r,
-            quotes: (r.quotes || []).filter((q) => q.seller?.toString() === vendorId.toString()),
-            quote_count: (r.quotes || []).length,
-        }));
-
-        return ok(res, shaped);
-    } catch (err) {
-        console.error("myRequests error:", err);
-        return fail(res, 500, "Server error");
-    }
-};
-
-/** GET /api/vendors/:vendorId/catalogue  (builder) — what this vendor stocks */
-exports.vendorCatalogue = async (req, res) => {
-    try {
-        const link = await VendorLink.findOne({
-            builder_id: callerId(req),
-            vendor_id:  req.params.vendorId,
-            status:     { $ne: "removed" },
+        const vendor = await VendorLink.findOne({
+            _id: req.params.id, builder_id: builderId, is_delete: 0,
         });
-        if (!link) return fail(res, 403, "That vendor is not on your roster");
+        if (!vendor) return fail(res, 404, "Supplier not found on your list");
 
-        const items = await Inventory.find({ seller_id: req.params.vendorId, is_available: true })
-            .sort({ category: 1, name: 1 })
-            .lean();
-        return ok(res, items);
+        const rfq = await RFQ.findOne({ _id: req.params.rfqId, is_delete: 0 });
+        if (!rfq) return fail(res, 404, "Request not found");
+        if (rfq.owner.toString() !== builderId.toString()) {
+            return fail(res, 403, "This request is not yours");
+        }
+
+        const price = Number(unit_price);
+        const entry = {
+            vendor_contact: vendor._id,
+            vendor_name: vendor.name,
+            unit_price: price,
+            total_price: price * (rfq.quantity || 0),
+            delivery_days: Number(delivery_days) || 7,
+            brand: brand || "",
+            note: note || "",
+            recorded_by_builder: true,
+            quoted_at: new Date(),
+        };
+
+        // One quote per supplier per request — re-recording replaces it, since
+        // a supplier revising their price over WhatsApp is normal.
+        const idx = (rfq.quotes || []).findIndex(
+            (q) => q.vendor_contact && q.vendor_contact.toString() === vendor._id.toString()
+        );
+        if (idx >= 0) rfq.quotes[idx] = { ...rfq.quotes[idx].toObject?.() ?? {}, ...entry };
+        else rfq.quotes.push(entry);
+
+        if (rfq.status === "open") rfq.status = "quoted";
+        await rfq.save();
+
+        await VendorLink.updateOne({ _id: vendor._id }, { $inc: { quotes_given: 1 } });
+
+        return ok(res, rfq, 201);
     } catch (err) {
-        console.error("vendorCatalogue error:", err);
+        console.error("recordQuote error:", err);
         return fail(res, 500, "Server error");
     }
 };

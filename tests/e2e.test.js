@@ -219,15 +219,23 @@ function check(name, cond, detail = '') {
     r.body?.data?.total_budget === undefined,
     `total_budget=${r.body?.data?.total_budget} ← should be absent for field_staff`);
 
-  console.log('\n─── 9. Vendor roster & RFQ ───────────────────────────');
+  console.log('\n─── 9. Suppliers (WhatsApp contacts, not app users) ──');
 
-  r = await api.post('/api/vendors/invite').set(auth(T.builder))
-        .send({ phone: '9000000004', display_name: 'Cement Depot', supplies: ['cement'] });
-  check('builder can add an existing user as vendor', r.status === 200, `got ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
-  check('existing user linked immediately', r.body?.data?.linked === true, `got ${JSON.stringify(r.body?.data).slice(0,120)}`);
+  r = await api.post('/api/vendors').set(auth(T.builder))
+        .send({ name: 'Cement Depot', phone: '9888800001', supplies: ['cement'] });
+  check('builder can add a supplier contact', r.status === 201, `got ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
+  const vendorId = r.body?.data?._id;
+
+  r = await api.post('/api/vendors').set(auth(T.builder))
+        .send({ name: 'Dup Depot', phone: '9888800001', supplies: ['cement'] });
+  check('duplicate supplier number rejected', r.status === 409, `got ${r.status}`);
+
+  r = await api.post('/api/vendors').set(auth(T.builder))
+        .send({ name: 'Steel Mart', phone: '9888800002', supplies: ['steel'] });
+  check('second supplier added', r.status === 201, `got ${r.status}`);
 
   r = await api.get('/api/vendors').set(auth(T.builder));
-  check('roster lists the vendor', (r.body?.data || []).length === 1, `got ${(r.body?.data||[]).length}`);
+  check('list returns both suppliers', (r.body?.data || []).length === 2, `got ${(r.body?.data||[]).length}`);
 
   const rfq = await RFQ.create({
     owner: builder._id, ownerModel: 'user', project_id: pid,
@@ -237,22 +245,36 @@ function check(name, cond, detail = '') {
   });
 
   r = await api.post(`/api/vendors/dispatch-rfq/${rfq._id}`).set(auth(T.builder));
-  check('builder dispatches RFQ to roster', r.status === 200, `got ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
-  check('RFQ reached 1 supplier', r.body?.data?.sent_to === 1, `got ${r.body?.data?.sent_to}`);
+  check('dispatch returns WhatsApp targets', r.status === 200, `got ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
+  check('only the cement supplier matched (category filter)',
+    (r.body?.data?.targets || []).length === 1,
+    `got ${(r.body?.data?.targets||[]).length}`);
+  check('target carries a wa.me link with the message prefilled',
+    `${r.body?.data?.targets?.[0]?.whatsapp_url}`.startsWith('https://wa.me/') &&
+    decodeURIComponent(`${r.body?.data?.targets?.[0]?.whatsapp_url}`).includes('OPC Cement'),
+    `got ${r.body?.data?.targets?.[0]?.whatsapp_url}`);
 
-  r = await api.get('/api/vendors/my-requests').set(auth(T.vendor));
-  check('vendor sees the dispatched request', r.status === 200 && (r.body?.data||[]).length === 1,
-    `status=${r.status} count=${(r.body?.data||[]).length}`);
+  r = await api.post(`/api/vendors/${vendorId}/record-quote/${rfq._id}`)
+        .set(auth(T.builder)).send({ unit_price: 385, delivery_days: 3 });
+  check('builder records the price quoted back', r.status === 201, `got ${r.status}: ${JSON.stringify(r.body).slice(0,180)}`);
+  check('quote total computed from quantity',
+    (r.body?.data?.quotes || []).some(q => q.total_price === 385 * 200),
+    `got ${JSON.stringify((r.body?.data?.quotes||[]).map(q=>q.total_price))}`);
 
-  r = await api.post(`/api/rfq/${rfq._id}/quote`).set(auth(T.vendor))
-        .send({ unit_price: 385, delivery_days: 3 });
-  check('vendor can submit a quote', r.status === 201,
-    `got ${r.status}: ${JSON.stringify(r.body).slice(0,180)}  ← vendorAuth / role in JWT`);
+  r = await api.post(`/api/vendors/${vendorId}/record-quote/${rfq._id}`)
+        .set(auth(T.builder)).send({ unit_price: 370 });
+  check('re-recording replaces rather than duplicates',
+    (r.body?.data?.quotes || []).length === 1,
+    `got ${(r.body?.data?.quotes||[]).length} quotes`);
 
-  r = await api.post(`/api/rfq/${rfq._id}/quote`).set(auth(T.outsider))
-        .send({ unit_price: 300 });
-  check('non-roster user cannot quote on roster RFQ',
-    r.status === 403, `got ${r.status} ← the hole I closed`);
+  r = await api.post(`/api/vendors/${vendorId}/record-quote/${rfq._id}`)
+        .set(auth(T.outsider)).send({ unit_price: 1 });
+  check('another builder cannot touch this supplier list', r.status === 404, `got ${r.status}`);
+
+  for (const [p, m] of [['/api/rfq/open','get'], ['/api/rfq/seller/my-quotes','get'], [`/api/rfq/${rfq._id}/quote`,'post']]) {
+    const rr = await (m === 'get' ? api.get(p) : api.post(p).send({ unit_price: 1 })).set(auth(T.vendor));
+    check(`${p} is retired (410)`, rr.status === 410, `got ${rr.status}`);
+  }
 
   console.log('\n─── 10. Unified auth (legacy silos retired) ──────────');
 

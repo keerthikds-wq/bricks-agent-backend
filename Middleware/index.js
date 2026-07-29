@@ -71,31 +71,12 @@ const builderAuth = (req, res, next) => {
  * their new token carries `role: 'vendor'` but not `isSeller`, so the old
  * `sellerAuth` gate would 403 them out of their own business.
  */
-const vendorAuth = (req, res, next) => {
-    auth(req, res, async () => {
-        if (!req.user) {
-            return res.status(403).json({ status: 403, message: 'Access denied: suppliers only.', error: true });
-        }
-        // Fast path: legacy seller token, or a token already carrying the role.
-        if (req.user.isSeller || req.user.role === 'vendor') return next();
-
-        // Login tokens do not include a `role` claim, so a merged vendor's
-        // token looks like any other user's. Fall back to the record itself —
-        // without this, genuine suppliers were 403'd out of quoting entirely.
-        try {
-            const User = require('../Model/User');
-            const id = req.user.id || req.user._id;
-            const u = id ? await User.findById(id).select('role').lean() : null;
-            if (u && u.role === 'vendor') {
-                req.user.role = 'vendor';
-                return next();
-            }
-        } catch (e) {
-            console.error('vendorAuth lookup error:', e.message);
-        }
-        return res.status(403).json({ status: 403, message: 'Access denied: suppliers only.', error: true });
-    });
-};
+/**
+ * `vendorAuth` was removed. It gated routes for a logged-in supplier, but
+ * suppliers do not use this app — the builder sends material requests over
+ * WhatsApp and records the prices that come back. See Model/VendorLink.js and
+ * Routes/rfq.js.
+ */
 
 /** Allows any authenticated role (including masonry and builder) */
 const verifyTokenwithAuthorization = (req, res, next) => {
@@ -107,4 +88,4 @@ const verifyTokenwithAuthorization = (req, res, next) => {
     });
 };
 
-module.exports = { Auth, auth, adminAuth, sellerAuth, vendorAuth, userAuth, masonryAuth, builderAuth, verifyTokenwithAuthorization };
+module.exports = { Auth, auth, adminAuth, sellerAuth, userAuth, masonryAuth, builderAuth, verifyTokenwithAuthorization };

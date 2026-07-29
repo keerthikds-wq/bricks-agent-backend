@@ -6,7 +6,16 @@ const { model, Schema } = require("mongoose");
  */
 const rfqQuoteSchema = new Schema(
     {
-        seller:         { type: Schema.Types.ObjectId, ref: "seller", required: true },
+        // Legacy: a marketplace seller account submitting their own quote.
+        // Optional now — suppliers are WhatsApp contacts, not app users, and
+        // the builder records what they quoted back. See Model/VendorLink.js.
+        seller:         { type: Schema.Types.ObjectId, ref: "seller" },
+
+        // Current: the supplier contact this price came from.
+        vendor_contact: { type: Schema.Types.ObjectId, ref: "vendorlink" },
+        vendor_name:    { type: String, default: "" },   // snapshot, survives contact deletion
+        recorded_by_builder: { type: Boolean, default: false },
+
         unit_price:     { type: Number, required: true },
         total_price:    { type: Number, required: true },
         delivery_days:  { type: Number, default: 7 },          // days from acceptance
@@ -38,7 +47,12 @@ const rfqSchema = new Schema(
         // marketplace RFQs still read correctly — nothing creates them anymore.
         // See MERGE_PLAN.md §Retired.
         dispatch_mode:  { type: String, enum: ["roster", "open"], default: "roster" },
-        // Vendors this RFQ was actually sent to (snapshot at send time).
+
+        // Supplier contacts this request was pushed to over WhatsApp.
+        sent_to_contacts: [{ type: Schema.Types.ObjectId, ref: "vendorlink" }],
+
+        // Legacy: user accounts an RFQ was broadcast to back when suppliers
+        // logged in. Retained so historical rows still read.
         sent_to:        [{ type: Schema.Types.ObjectId, ref: "user" }],
 
         // ── RFQ reference number (auto-generated) ────────────────────────────────

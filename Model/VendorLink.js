@@ -1,24 +1,30 @@
 const { model, Schema } = require("mongoose");
 
 /**
- * VendorLink — a builder's private vendor roster.
+ * VendorLink — a builder's private supplier CONTACT.
  *
- * This is the "vendors are linked with builder" decision made concrete. RFQs
- * are dispatched to the builder's roster only; the old open-marketplace
- * broadcast to every nearby seller is retired (see MERGE_PLAN.md §Retired).
+ * Vendors do not use this app. They have no account and no login: the builder
+ * creates a material request, sends it to his suppliers over WhatsApp, and
+ * records whatever they quote back. So this is an address-book entry owned by
+ * one builder, not a link between two user accounts.
  *
- * The link is builder-scoped, not project-scoped: a builder onboards a cement
- * supplier once and can then use them on every project. Per-project vendor
- * involvement is still recorded in ProjectMember when they're actually
- * engaged on a specific build.
+ * (An earlier version modelled vendors as app users with an invite/accept flow
+ * and an in-app RFQ inbox. That was wrong — suppliers in this trade answer on
+ * WhatsApp and will not install a builder's software. `user_id` below is the
+ * vestige of that model, kept only so historical rows still resolve.)
  */
 const vendorLinkSchema = new Schema(
     {
         builder_id: { type: Schema.Types.ObjectId, ref: "user", required: true, index: true },
-        vendor_id:  { type: Schema.Types.ObjectId, ref: "user", required: true, index: true },
 
-        // What this vendor is on the roster for. Mirrors Inventory.category so
-        // RFQ dispatch can target "who supplies cement" without a join.
+        // ── The contact ──────────────────────────────────────────────────────
+        name:  { type: String, required: true, trim: true },
+        phone: { type: String, required: true, trim: true },
+        company: { type: String, default: "" },
+        notes:   { type: String, default: "" },
+
+        /// What this supplier is on the roster for — drives which requests get
+        /// sent to them.
         supplies: {
             type: [String],
             enum: ["cement", "steel", "bricks", "sand", "aggregate", "tiles",
@@ -26,33 +32,26 @@ const vendorLinkSchema = new Schema(
             default: [],
         },
 
-        // Builder's own label — "Ravi Cement Depot (Kukatpally)".
-        display_name: { type: String, default: "" },
-        notes:        { type: String, default: "" },
+        // Builder's private opinion — separate from the public Review model.
+        preferred: { type: Boolean, default: false },
+        rating:    { type: Number, min: 0, max: 5, default: 0 },
 
-        // Builder's private rating, separate from the public Review model.
-        preferred:  { type: Boolean, default: false },
-        rating:     { type: Number, min: 0, max: 5, default: 0 },
+        // Rolling stats so the builder can see who actually responds.
+        rfqs_sent:    { type: Number, default: 0 },
+        quotes_given: { type: Number, default: 0 },
+        orders_won:   { type: Number, default: 0 },
 
-        // Rolling stats so the builder can see who actually delivers.
-        rfqs_sent:     { type: Number, default: 0 },
-        quotes_given:  { type: Number, default: 0 },
-        orders_won:    { type: Number, default: 0 },
+        // Optional: set only if this supplier ALSO happens to have an account
+        // (e.g. a migrated legacy seller). Nothing depends on it.
+        user_id: { type: Schema.Types.ObjectId, ref: "user", default: null },
 
-        status: {
-            type: String,
-            enum: ["invited", "active", "paused", "removed"],
-            default: "invited",
-            index: true,
-        },
-
-        invited_at:  { type: Date, default: Date.now },
-        accepted_at: { type: Date },
+        is_delete: { type: Number, enum: [0, 1], default: 0 },
     },
     { timestamps: true }
 );
 
-vendorLinkSchema.index({ builder_id: 1, vendor_id: 1 }, { unique: true });
-vendorLinkSchema.index({ builder_id: 1, supplies: 1, status: 1 });
+// One entry per phone per builder — stops duplicate address-book rows.
+vendorLinkSchema.index({ builder_id: 1, phone: 1 }, { unique: true });
+vendorLinkSchema.index({ builder_id: 1, supplies: 1, is_delete: 1 });
 
 module.exports = model("vendorlink", vendorLinkSchema);

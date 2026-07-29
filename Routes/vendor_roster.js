@@ -8,23 +8,18 @@ const attachRole = require("../Middleware/attachRole");
 const Auth = [verifyTokenwithAuthorization, attachRole];
 
 /**
- * Vendor roster — builder-scoped supplier management.
- * Replaces the open marketplace seller discovery.
+ * Supplier address book — builder-only.
+ *
+ * Suppliers have no account here. The builder keeps contacts, sends material
+ * requests over WhatsApp, and records the prices that come back. There is
+ * deliberately no vendor login, invite/accept, or supplier inbox.
  */
 
-// Public — invite preview shown before login. Must precede the auth'd routes.
-router.get ("/invite/:token",                  ctrl.vendorInviteInfo);
-
-// Vendor-side
-router.get ("/my-requests",              Auth, ctrl.myRequests);
-router.post("/invite/:token/accept",     Auth, ctrl.acceptVendorInvite);
-
-// Builder-side
-router.get   ("/",                       Auth, ctrl.listVendors);
-router.post  ("/invite",                 Auth, ctrl.inviteVendor);
-router.post  ("/dispatch-rfq/:rfqId",    Auth, ctrl.dispatchRfq);
-router.get   ("/:vendorId/catalogue",    Auth, ctrl.vendorCatalogue);
-router.patch ("/:linkId",                Auth, ctrl.updateVendor);
-router.delete("/:linkId",                Auth, ctrl.removeVendor);
+router.get   ("/",                            Auth, ctrl.listVendors);
+router.post  ("/",                            Auth, ctrl.addVendor);
+router.post  ("/dispatch-rfq/:rfqId",         Auth, ctrl.dispatchRfq);
+router.post  ("/:id/record-quote/:rfqId",     Auth, ctrl.recordQuote);
+router.patch ("/:id",                         Auth, ctrl.updateVendor);
+router.delete("/:id",                         Auth, ctrl.removeVendor);
 
 module.exports = router;
