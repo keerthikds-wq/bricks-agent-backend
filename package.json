@@ -7,7 +7,7 @@
     "start": "node handler.js",
     "dev": "nodemon handler.js",
     "deploy": "serverless deploy",
-    "test": "node tests/e2e.test.js && node tests/migration.test.js",
+    "test": "node tests/e2e.test.js && node tests/migration.test.js && node tests/auth_doors.test.js",
     "test:e2e": "node tests/e2e.test.js",
     "test:migration": "node tests/migration.test.js"
   },

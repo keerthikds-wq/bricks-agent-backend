@@ -15,25 +15,30 @@ const router = express.Router();
  * update". Mounted BEFORE the legacy routers so they win the match.
  *
  * Everything else on those routers (profiles, inventory, premium) is untouched
- * — only the login doors are closed.
+ * — only the auth doors are closed. See Middleware/retiredAuth.js for why they
+ * are matched by shape instead of listed by name.
  */
-const authRetired = (req, res) =>
-    res.status(410).send({
-        status: 410,
-        error: true,
-        moved_to: '/api/auth/login',
-        message:
-            'Separate logins have been replaced by a single Bricks Agent account. ' +
-            'Please update the app and sign in with your phone number.',
-    });
+const { retireAuthDoors } = require('../Middleware/retiredAuth');
 
-for (const p of [
-    '/seller/login', '/seller/login/otp-verify',
-    '/builder/login', '/builder/login/otp-verify',
-    '/masonry/login', '/masonry/login/otp-verify',
-]) {
-    router.post(p, authRetired);
+// The legacy silos: every auth door closed, nothing else touched.
+for (const silo of ['/seller', '/builder', '/masonry']) {
+    router.use(silo, retireAuthDoors());
 }
+
+// The unified account keeps exactly the three doors the app calls. `/sign-up`
+// and `/otp-verify` are the pre-merge pair — `/sign-up` minted a token without
+// ever checking an OTP, so it closes with the rest.
+router.use('/auth', retireAuthDoors({
+    except: ['/login', '/login/otp-verify', '/register'],
+}));
+
+// Admin still signs in — the marketplace catalogue is published through it —
+// but `/admin/sign-up` called Admin.create(req.body) behind no auth at all,
+// which made a full admin account a single unauthenticated POST. Closed.
+// Additional admins are a deliberate DB operation now, not a public endpoint.
+router.use('/admin', retireAuthDoors({
+    except: ['/login', '/otp-verify', '/forgot-password', '/change-password', '/email-verify'],
+}));
 
 router.use('/auth', require("./login"));
 router.use('/admin', require("./login-admin"));
