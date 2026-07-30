@@ -147,6 +147,32 @@ const eq = (n, actual, expected) =>
     eq('wages_due', sum.wages_due, 5400);
     eq('payable now includes wages', sum.payable, 58000 + 5400);
 
+    // Regression: a rate created through the API, priced against a log posted
+    // the same day. The earlier fixtures created WageRate directly and inherited
+    // the schema default of epoch, so they could never catch this — the live
+    // server accrued zero because effective_from carried the wall clock and the
+    // log had been normalised to midnight.
+    console.log('\n─── A rate set today prices today\'s log ─────────────────────');
+    const p3 = await Project.create({
+        builder_id: builder._id, name: 'Same Day Site', address: 'S',
+        area_sqft: 100, floors: 1, budget: 500000,
+    });
+    const rateRes = await api.post('/api/wage-rates').set(auth(B))
+        .send({ trade: 'painter', daily_rate: '750', standard_hours: 8 });
+    check('rate created through the API', rateRes.status === 201, `got ${rateRes.status}`);
+
+    const sameDay = await api.post(`/api/projects/${p3._id}/daily-logs`).set(auth(B)).send({
+        log_date: new Date().toISOString(),
+        labour: [{ trade: 'painter', count: 2, hours: 8 }],
+        work_done: 'Painting',
+    });
+    eq('today\'s log prices against a rate set today (2 x 750)',
+        sameDay.body.data?.wages?.accrued_paise, 150000);
+    check('and the trade is not reported as missing a rate',
+        (sameDay.body.data?.wages?.missing_rates || []).isEmpty !== false &&
+            (sameDay.body.data?.wages?.missing_rates || []).length === 0,
+        `got ${JSON.stringify(sameDay.body.data?.wages?.missing_rates)}`);
+
     console.log('\n─── A trade with no rate is reported, not valued at zero ────');
     const log2 = await api.post(`${P}/daily-logs`).set(auth(B)).send({
         log_date: new Date(Date.now() - 864e5).toISOString(),
@@ -238,7 +264,9 @@ const eq = (n, actual, expected) =>
     for (const f of ['total_receivable', 'total_paid', 'total_received', 'outstanding', 'wages_due', 'net_position']) {
         check(`dashboard exposes ${f}`, dash[f] !== undefined, 'absent');
     }
-    eq('dashboard wages_due matches the project', dash.wages_due, 5400 + 2400);
+    // Across every project the builder can see: 5400 + 2400 on the main site,
+    // plus 1500 from the same-day-rate regression project.
+    eq('dashboard wages_due sums every project', dash.wages_due, 5400 + 2400 + 1500);
     eq('dashboard total_paid matches', dash.total_paid, 58000);
 
     // ── Exactness end to end ────────────────────────────────────────────────

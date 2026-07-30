@@ -47,6 +47,28 @@ const wageRateSchema = new Schema(
 wageRateSchema.index({ builder_id: 1, trade: 1, effective_from: -1 });
 
 /**
+ * Rates are effective from the START of their day.
+ *
+ * Daily logs normalise `log_date` to midnight, so a rate stamped with the wall
+ * clock could never price the day it was created: a builder setting ₹900 for
+ * masons at 19:47 and posting that evening's log got zero wages, because
+ * 19:47 <= 00:00 is false. Every new builder would have hit that on day one,
+ * and it would have read as the feature simply not working.
+ *
+ * Normalising here rather than in the controller means it holds for every path
+ * that creates a rate — including the tests, which is precisely how the bug
+ * slipped through the first time.
+ */
+wageRateSchema.pre("save", function (next) {
+    if (this.effective_from) {
+        const d = new Date(this.effective_from);
+        d.setHours(0, 0, 0, 0);
+        this.effective_from = d;
+    }
+    next();
+});
+
+/**
  * The rate in force for a trade on a given date.
  *
  * Returns null rather than guessing when no rate is configured — a wage of zero
