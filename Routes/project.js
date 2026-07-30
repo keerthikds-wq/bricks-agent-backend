@@ -5,6 +5,7 @@ const ctrl     = require("../Controller/project");
 const collab   = require("../Controller/project_collab");
 const workflow = require("../Controller/project_workflow");
 const ai       = require("../Controller/project_ai");
+const ledger   = require("../Controller/ledger");
 
 const { verifyTokenwithAuthorization } = require("../Middleware");
 const { projectAccess, requireCapability } = require("../Middleware/projectAccess");
@@ -66,6 +67,17 @@ router.post ("/:pid/payments",                 Auth, projectAccess("builder"), c
 router.patch("/:pid/payments/:payId/mark-paid",Auth, projectAccess("builder"), collab.markPaid);
 
 /* ── Approvals ────────────────────────────────────────────────────────── */
+/* ── Ledger: every rupee in and out ───────────────────────────────────── */
+// Builder and client only. Field staff post daily logs (which accrue wages)
+// but must not see the commercial position — the same reason payments are
+// scoped this way.
+router.get  ("/:pid/ledger",         Auth, projectAccess("builder", "client"), ledger.listEntries);
+router.get  ("/:pid/ledger/summary", Auth, projectAccess("builder", "client"), ledger.projectSummary);
+router.post ("/:pid/ledger",         Auth, projectAccess("builder"),           ledger.addEntry);
+router.post ("/:pid/ledger/reconcile", Auth, projectAccess("builder"),         ledger.reconcile);
+router.patch("/:pid/ledger/:entryId/settle", Auth, projectAccess("builder"),   ledger.settleEntry);
+router.patch("/:pid/ledger/:entryId/cancel", Auth, projectAccess("builder"),   ledger.cancelEntry);
+
 router.get  ("/:pid/approvals",             Auth, projectAccess("any"), collab.listApprovals);
 router.post ("/:pid/approvals",             Auth, projectAccess("builder", "client", "field_staff"), collab.createApproval);
 router.patch("/:pid/approvals/:aid/decide", Auth, projectAccess("builder", "client", "field_staff"), collab.decideApproval);

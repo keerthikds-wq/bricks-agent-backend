@@ -84,5 +84,6 @@ router.use('/projects',              require("./project"));
 router.use('/vendors',               require("./vendor_roster"));
 router.use('/builder-subscription',  require("./builder_subscription"));
 router.use('/project-notifications', require("./project_notification"));
+router.use('/wage-rates',            require("./wage_rate"));
 
 module.exports = router;

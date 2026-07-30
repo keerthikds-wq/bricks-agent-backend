@@ -13,6 +13,12 @@ const LabourSchema = new Schema(
         trade: { type: String, required: true },   // "mason", "helper", "carpenter"
         count: { type: Number, required: true, min: 0 },
         hours: { type: Number, default: 8 },
+
+        // Optional override for the day. Left at 0, the log is valued against
+        // the builder's configured WageRate for the trade, which is the normal
+        // path — supervisors count heads, builders set rates. Set it only when
+        // someone was genuinely paid differently that day.
+        rate: { type: Number, default: 0, min: 0 },
     },
     { _id: false }
 );

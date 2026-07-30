@@ -10,6 +10,7 @@ const User            = require("../Model/User");
 const { callerId }      = require("../Middleware/projectAccess");
 const { notifyProject } = require("../Utils/projectNotify");
 const { emitToProject } = require("../Utils/realtime");
+const ledger            = require("./ledger");
 
 const ok   = (res, data, status = 200) => res.status(status).json({ success: true, data });
 const fail = (res, status, message)    => res.status(status).json({ success: false, message });
@@ -170,9 +171,14 @@ exports.addPayment = async (req, res) => {
             ...(status === "paid" ? { paid_at: new Date(), paid_offline: true } : {}),
         });
 
-        if (p.status === "paid") {
-            await Project.updateOne({ _id: req.project._id }, { $inc: { spent: p.amount } });
-        }
+        // A stage payment is money the CLIENT owes the builder, so settling one
+        // is income. It used to do `$inc: { spent }`, which counted money coming
+        // in as money going out and made the dashboard's "Spent" figure the sum
+        // of the builder's own receipts. `spent` is now derived from the ledger's
+        // settled outgoings instead, which is the only definition that survives
+        // having real bills in the system.
+        await ledger.mirrorProjectPayment(p, req.project);
+        await ledger.syncProjectSpent(req.project._id);
 
         await notifyProject(req.project._id, {
             title: "Payment request",
@@ -214,7 +220,10 @@ exports.markPaid = async (req, res) => {
         p.paid_offline = true;
         await p.save();
 
-        await Project.updateOne({ _id: req.project._id }, { $inc: { spent: p.amount } });
+        // See addPayment: this is money received, not spent. The ledger mirror
+        // moves to `settled` and `spent` is recomputed from real outgoings.
+        await ledger.mirrorProjectPayment(p, req.project);
+        await ledger.syncProjectSpent(req.project._id);
 
         emitToProject(req.project._id, "payment:paid", { payment: p });
         await notifyProject(req.project._id, {
@@ -496,7 +505,14 @@ exports.addDailyLog = async (req, res) => {
             excludeUserId: callerId(req),
         });
 
-        return ok(res, log, 201);
+        // Value the labour and book it as accrued wages. This is what makes
+        // "every wage captured" true without the supervisor doing arithmetic:
+        // they count heads, the builder sets rates once, and the cost follows.
+        // Trades with no configured rate are named in the response rather than
+        // valued at zero — a silent zero understates what the build cost.
+        const wages = await ledger.accrueWagesForLog(log, req.project);
+
+        return ok(res, { ...log.toObject(), wages }, 201);
     } catch (err) {
         if (err.code === 11000) {
             return fail(res, 409, "You have already posted a log for this date. Edit that one instead.");

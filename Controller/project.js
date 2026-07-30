@@ -440,6 +440,34 @@ exports.dashboard = async (req, res) => {
             payload.total_budget    = projects.reduce((s, p) => s + (p.budget || 0), 0);
             payload.total_spent     = projects.reduce((s, p) => s + (p.spent  || 0), 0);
             payload.pending_payments = pendingPayments;
+
+            // The business position, across every project the caller can see.
+            //
+            // `total_budget` and `total_spent` alone cannot answer the questions
+            // a builder actually has — what am I owed, what do I owe, are wages
+            // outstanding, am I heading over budget on committed cost rather
+            // than on cash already gone. All of it comes from one aggregation
+            // over the ledger so the figures cannot disagree with each other.
+            const { positionFor } = require("./ledger");
+            const position = await positionFor(ids);
+
+            payload.finance = {
+                ...position,
+                // Cost committed whether or not it has been paid. This is the
+                // number that warns of an overrun; `spent` reports it too late.
+                committed: position.paid + position.payable,
+                budget_remaining: payload.total_budget - (position.paid + position.payable),
+            };
+
+            // Flat aliases so a screen can read a single figure without
+            // destructuring, and so the names match what the app asks for.
+            payload.total_received   = position.received;
+            payload.total_receivable = position.receivable;
+            payload.total_paid       = position.paid;
+            payload.total_payable    = position.payable;
+            payload.outstanding      = position.receivable;
+            payload.wages_due        = position.wages_due;
+            payload.net_position     = position.net_position;
         }
 
         if (role === "builder") {
