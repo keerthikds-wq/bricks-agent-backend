@@ -318,6 +318,36 @@ const eq = (n, actual, expected) =>
     eq('second line exact', frac.body.data?.line_items?.[1]?.amount_paise, 24699);
     eq('bill total is the sum of its lines', frac.body.data?.amount_paise, 1037688 + 24699);
 
+    // ── Finance overview ────────────────────────────────────────────────────
+    console.log('\n─── Finance overview (the Finance screen) ───────────────────');
+    const fin = await api.get('/api/finance/overview?months=6').set(auth(B));
+    check('overview responds', fin.status === 200, `got ${fin.status}`);
+    const F = fin.body.data;
+
+    eq('series has one point per month', F?.series?.length, 6);
+    check('empty months are still present',
+        (F?.series || []).every((m) => m.income !== undefined && m.expense !== undefined),
+        'a month came back without figures — dropping quiet months compresses time '
+        + 'and makes a slow period look busy');
+
+    // The three headline figures must agree with each other, which is the whole
+    // reason they come from one request.
+    eq('income matches the position', F?.position?.received, 500000);
+    eq('expenses match the position', F?.position?.paid, 58000);
+    eq('profit is income minus expenses',
+        F?.position?.net_position, 500000 - 58000);
+
+    check('top expenses sorted largest first',
+        (F?.top_expenses || []).every((e, i, a) => i === 0 || a[i - 1].amount_paise >= e.amount_paise),
+        'out of order');
+    const shareSum = (F?.top_expenses || []).reduce((a, e) => a + e.share_pct, 0);
+    check('shares add up to the outgoing total', shareSum >= 99 && shareSum <= 101,
+        `shares summed to ${shareSum}`);
+
+    const staffFin = await api.get('/api/finance/overview').set(auth(S));
+    check('field staff cannot see finance (403)',
+        staffFin.status === 403, `got ${staffFin.status} — LEAK`);
+
     console.log('\n─── Reconcile is idempotent ─────────────────────────────────');
     const before2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     await api.post(`${P}/ledger/reconcile`).set(auth(B)).send({});

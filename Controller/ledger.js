@@ -542,3 +542,134 @@ module.exports.positionFor = positionFor;
 module.exports.mirrorProjectPayment = mirrorProjectPayment;
 module.exports.accrueWagesForLog = accrueWagesForLog;
 module.exports.syncProjectSpent = syncProjectSpent;
+
+/* ────────────────────────── Finance overview ─────────────────────────────── */
+
+/**
+ * GET /api/finance/overview?months=6
+ *
+ * Everything the Finance screen needs in one call: the position across every
+ * project the caller can see, a month-by-month series for the chart, and
+ * expenses broken down by category.
+ *
+ * One request rather than three, because the three figures must agree. Fetched
+ * separately they are three snapshots taken at different instants, and a
+ * builder who sees profit that does not equal income minus expenses stops
+ * believing the screen.
+ *
+ * Builder and client only — the same rule the project ledger follows.
+ */
+exports.financeOverview = async (req, res) => {
+    try {
+        const money = require("../Utils/money");
+        const Project = require("../Model/Project");
+        const { visibleProjectFilter } = require("../Middleware/projectAccess");
+
+        const userId = callerId(req);
+        const filter = await visibleProjectFilter(userId, req.user);
+        const projects = await Project.find(filter).select("_id budget").lean();
+        const ids = projects.map((p) => p._id);
+
+        const months = Math.min(Math.max(parseInt(req.query.months, 10) || 6, 1), 24);
+
+        // Window starts at the first of the month, `months - 1` months back, so
+        // the current partial month is the last point on the chart rather than
+        // being excluded for not having finished yet.
+        const start = new Date();
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        start.setMonth(start.getMonth() - (months - 1));
+
+        const [position, seriesRows] = await Promise.all([
+            positionFor(ids),
+            ids.length
+                ? LedgerEntry.aggregate([
+                      {
+                          $match: {
+                              project_id: { $in: ids },
+                              is_delete: 0,
+                              status: "settled",
+                              occurred_on: { $gte: start },
+                          },
+                      },
+                      {
+                          $group: {
+                              _id: {
+                                  y: { $year: "$occurred_on" },
+                                  m: { $month: "$occurred_on" },
+                                  direction: "$direction",
+                              },
+                              total: { $sum: "$amount_paise" },
+                          },
+                      },
+                  ])
+                : [],
+        ]);
+
+        // Build every month in the window, including empty ones. A chart that
+        // silently drops months with no activity compresses time and makes a
+        // quiet period look like a busy one.
+        const buckets = new Map();
+        for (let i = 0; i < months; i++) {
+            const d = new Date(start);
+            d.setMonth(start.getMonth() + i);
+            buckets.set(`${d.getFullYear()}-${d.getMonth() + 1}`, {
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                income_paise: 0,
+                expense_paise: 0,
+            });
+        }
+        for (const r of seriesRows) {
+            const key = `${r._id.y}-${r._id.m}`;
+            const b = buckets.get(key);
+            if (!b) continue;
+            if (r._id.direction === "in") b.income_paise += r.total;
+            else b.expense_paise += r.total;
+        }
+
+        const series = [...buckets.values()].map((b) => ({
+            ...b,
+            income: money.toRupees(b.income_paise),
+            expense: money.toRupees(b.expense_paise),
+            profit: money.toRupees(b.income_paise - b.expense_paise),
+            profit_paise: b.income_paise - b.expense_paise,
+        }));
+
+        // Month-on-month change, expressed against the previous full month.
+        // Null rather than 0 when there is no baseline — "+0%" implies a
+        // comparison was made, and none was.
+        let change_pct = null;
+        if (series.length >= 2) {
+            const prev = series[series.length - 2].profit_paise;
+            const curr = series[series.length - 1].profit_paise;
+            if (prev !== 0) change_pct = ((curr - prev) / Math.abs(prev)) * 100;
+        }
+
+        // Expenses by category, largest first, with each share of the total.
+        const outTotal = Object.values(position.by_category_paise || {})
+            .reduce((a, b) => a + b, 0);
+        const top_expenses = Object.entries(position.by_category_paise || {})
+            .map(([category, paise]) => ({
+                category,
+                amount: money.toRupees(paise),
+                amount_paise: paise,
+                share_pct: outTotal > 0 ? Math.round((paise / outTotal) * 100) : 0,
+            }))
+            .sort((a, b) => b.amount_paise - a.amount_paise);
+
+        return ok(res, {
+            position,
+            series,
+            change_pct,
+            top_expenses,
+            projects_count: projects.length,
+            total_budget: money.toRupees(
+                money.sum(projects.map((p) => money.toPaise(p.budget || 0)))
+            ),
+        });
+    } catch (err) {
+        console.error("financeOverview error:", err);
+        return fail(res, 500, "Server error");
+    }
+};
