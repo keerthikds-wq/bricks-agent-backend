@@ -6,6 +6,8 @@ const collab   = require("../Controller/project_collab");
 const workflow = require("../Controller/project_workflow");
 const ai       = require("../Controller/project_ai");
 const ledger   = require("../Controller/ledger");
+const memory   = require("../Controller/memory");
+const intel    = require("../Controller/intelligence");
 
 const { verifyTokenwithAuthorization } = require("../Middleware");
 const { projectAccess, requireCapability } = require("../Middleware/projectAccess");
@@ -43,6 +45,13 @@ router.put   ("/:pid/phase/:index", Auth, projectAccess("builder", "field_staff"
 /* ── Workflow ─────────────────────────────────────────────────────────── */
 router.get("/:pid/workflow", Auth, projectAccess("any"), workflow.getWorkflow);
 
+/* ── Memory & Intelligence ────────────────────────────────────────────── */
+// Anyone on the project can read its timeline: a client asking "when was the
+// staircase changed" deserves the same answer as the builder. Money inside the
+// stream is already filtered by the ledger's own rules.
+router.get("/:pid/memory", Auth, projectAccess("any"), memory.projectMemory);
+router.get("/:pid/health", Auth, projectAccess("any"), intel.projectHealth);
+
 /* ── Members ──────────────────────────────────────────────────────────── */
 router.get   ("/:pid/members",           Auth, projectAccess("any"),     ctrl.listMembers);
 router.post  ("/:pid/invite",            Auth, projectAccess("builder"), ctrl.createInvite);
@@ -66,7 +75,6 @@ router.get  ("/:pid/payments",                 Auth, projectAccess("builder", "c
 router.post ("/:pid/payments",                 Auth, projectAccess("builder"), collab.addPayment);
 router.patch("/:pid/payments/:payId/mark-paid",Auth, projectAccess("builder"), collab.markPaid);
 
-/* ── Approvals ────────────────────────────────────────────────────────── */
 /* ── Ledger: every rupee in and out ───────────────────────────────────── */
 // Builder and client only. Field staff post daily logs (which accrue wages)
 // but must not see the commercial position — the same reason payments are

@@ -88,5 +88,6 @@ router.use('/wage-rates',            require("./wage_rate"));
 router.use('/finance',               require("./finance"));
 router.use('/people',                require("./people"));
 router.use('/assistant',             require("./assistant"));
+router.use('/intelligence',          require("./intelligence"));
 
 module.exports = router;
