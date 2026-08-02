@@ -348,6 +348,41 @@ const eq = (n, actual, expected) =>
     check('field staff cannot see finance (403)',
         staffFin.status === 403, `got ${staffFin.status} — LEAK`);
 
+    // ── Assistant grounding ─────────────────────────────────────────────────
+    //
+    // The summary must be plain aggregation. If a language model ever gets
+    // between these counts and the screen, this is the test that should fail.
+    console.log('\n─── Assistant summary is real data ──────────────────────────');
+    const asum = await api.get('/api/assistant/summary').set(auth(B));
+    check('summary responds', asum.status === 200, `got ${asum.status}`);
+    const A = asum.body.data;
+
+    check('summary carries rows', Array.isArray(A?.rows) && A.rows.length > 0,
+        'no rows returned');
+
+    // Every figure must trace back to the ledger and project state.
+    const ctx = A?.context;
+    eq('context receivable matches the ledger', ctx?.receivable, 0);
+    eq('context paid matches the ledger', ctx?.paid, 58000);
+    check('context counts the builder\'s projects',
+        (ctx?.projects_total || 0) >= 2,
+        `got ${ctx?.projects_total}`);
+
+    // The mockup has a "material deliveries" row. Nothing tracks deliveries, so
+    // it must be absent rather than filled with a plausible number.
+    check('no row is invented for data we do not have',
+        !(A?.rows || []).some((r) => /deliver/i.test(r.value || '')),
+        'a deliveries row appeared — nothing in the system tracks deliveries');
+
+    const askEmpty = await api.post('/api/assistant/ask').set(auth(B)).send({});
+    check('an empty question is refused (400)', askEmpty.status === 400,
+        `got ${askEmpty.status}`);
+
+    const askLong = await api.post('/api/assistant/ask').set(auth(B))
+        .send({ question: 'x'.repeat(600) });
+    check('an oversized question is refused (400)', askLong.status === 400,
+        `got ${askLong.status}`);
+
     console.log('\n─── Reconcile is idempotent ─────────────────────────────────');
     const before2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     await api.post(`${P}/ledger/reconcile`).set(auth(B)).send({});
