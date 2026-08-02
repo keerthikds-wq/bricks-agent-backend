@@ -155,7 +155,9 @@ exports.summary = async (req, res) => {
         if (ctx.receivable_paise > 0) {
             rows.push({
                 key: "payments",
-                value: `${ctx.receivable} pending`,
+                // Formatted, not raw. "400000 pending" is a number a human has
+                // to parse; "₹4,00,000 pending" is one they read.
+                value: `${money.formatRupees(ctx.receivable_paise)} pending`,
                 note: `${ctx.receivable_count} unpaid item${ctx.receivable_count === 1 ? "" : "s"}`,
                 tone: "warn",
             });
