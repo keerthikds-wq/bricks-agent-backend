@@ -17,6 +17,7 @@ const Auth = [verifyTokenwithAuthorization, attachRole];
  * person could reach by tapping around the app.
  */
 router.get("/summary", Auth, assistant.summary);
+router.get("/suggestions", Auth, assistant.suggestions);
 router.post("/ask", Auth, assistant.ask);
 
 module.exports = router;

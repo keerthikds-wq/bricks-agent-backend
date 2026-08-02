@@ -383,6 +383,62 @@ const eq = (n, actual, expected) =>
     check('an oversized question is refused (400)', askLong.status === 400,
         `got ${askLong.status}`);
 
+    // ── Copilot suggestions ─────────────────────────────────────────────────
+    //
+    // These drive the inline Copilot, so they must be derived from real
+    // conditions rather than generated. A suggestion the data cannot answer is
+    // worse than no suggestion: the builder taps it and gets "I don't have
+    // that", which teaches them the feature does not work.
+    console.log('\n─── Copilot suggestions are grounded ────────────────────────');
+    const sug = await api.get('/api/assistant/suggestions').set(auth(B));
+    check('suggestions respond', sug.status === 200, `got ${sug.status}`);
+    const SUG = sug.body.data?.suggestions || [];
+
+    check('suggestions are never empty', SUG.length > 0,
+        'a builder with nothing wrong still needs somewhere to start');
+    check('suggestions stay a short list, not a menu', SUG.length <= 4,
+        `got ${SUG.length}`);
+    check('every suggestion carries the reason it is being offered',
+        SUG.every((s) => s.question && s.why),
+        'a suggestion arrived with no question or no reason');
+    check('suggestions do not repeat',
+        new Set(SUG.map((s) => s.question)).size === SUG.length,
+        'the same question was offered twice');
+
+    // This builder's outgoings are settled and nothing is receivable, so the
+    // "who owes me money" prompt must NOT appear. Deriving them from the data
+    // is the entire point — a generated list would offer it regardless.
+    check('no money-owed prompt when nothing is owed',
+        !SUG.some((s) => /owes me money/i.test(s.question)),
+        'offered to chase payments that do not exist');
+
+    // Scope: suggestions come from visibleProjectFilter, same as everything
+    // else, so field staff get their own rather than the builder's position.
+    const sugS = await api.get('/api/assistant/suggestions').set(auth(S));
+    check('field staff get their own suggestions (200)', sugS.status === 200,
+        `got ${sugS.status}`);
+
+    // A project_id the caller cannot reach must be ignored, not honoured — it
+    // is resolved through the caller's own filter, so scoping can only narrow.
+    // The request must still be handled rather than throwing.
+    const askForeign = await api.post('/api/assistant/ask').set(auth(S))
+        .send({
+            question: 'How is it going?',
+            project_id: new mongoose.Types.ObjectId(),
+        });
+    check('an unreachable project_id is ignored, not fatal',
+        askForeign.status !== 500,
+        `got ${askForeign.status} — scoping should skip it, not throw`);
+
+    // With no AI key configured in tests, ask must degrade to "unavailable"
+    // rather than a bare 500. A builder cannot tell a provider outage from a
+    // broken app, so the distinction has to survive to the response.
+    const askDown = await api.post('/api/assistant/ask').set(auth(B))
+        .send({ question: 'How is my business doing?' });
+    check('an AI outage reads as unavailable, not as a server error',
+        askDown.status !== 500,
+        `got ${askDown.status} — a provider failure leaked as a 500`);
+
     console.log('\n─── Reconcile is idempotent ─────────────────────────────────');
     const before2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     await api.post(`${P}/ledger/reconcile`).set(auth(B)).send({});
