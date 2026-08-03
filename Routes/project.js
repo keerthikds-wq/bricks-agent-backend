@@ -8,6 +8,8 @@ const ai       = require("../Controller/project_ai");
 const ledger   = require("../Controller/ledger");
 const memory   = require("../Controller/memory");
 const intel    = require("../Controller/intelligence");
+const attendance = require("../Controller/attendance");
+const cashflow   = require("../Controller/cashflow");
 
 const { verifyTokenwithAuthorization } = require("../Middleware");
 const { projectAccess, requireCapability } = require("../Middleware/projectAccess");
@@ -94,6 +96,22 @@ router.patch("/:pid/approvals/:aid/decide", Auth, projectAccess("builder", "clie
 router.get   ("/:pid/documents",        Auth, projectAccess("any"),     collab.listDocuments);
 router.post  ("/:pid/documents",        Auth, projectAccess("builder", "field_staff"), collab.addDocument);
 router.delete("/:pid/documents/:docId", Auth, projectAccess("builder"), collab.deleteDocument);
+
+/* ── Attendance ───────────────────────────────────────────────────────── */
+// Marked by whoever runs the site — the same people who post daily logs, gated
+// on the same capability. The SUMMARY is builder/client only: it names people
+// and what they earned, which is payroll, not site information.
+router.get ("/:pid/attendance",         Auth, projectAccess("builder", "field_staff"),
+                                              requireCapability("can_log_progress"), attendance.getSheet);
+router.post("/:pid/attendance",         Auth, projectAccess("builder", "field_staff"),
+                                              requireCapability("can_log_progress"), attendance.markSheet);
+router.get ("/:pid/attendance/summary", Auth, projectAccess("builder"), attendance.summary);
+
+/* ── Invoice ──────────────────────────────────────────────────────────── */
+// Builder and client: it is the client's own statement. Derived on read from
+// the ledger, never stored — see cashflow.js.
+router.get("/:pid/invoice", Auth, projectAccess("builder", "client"),
+                                  requireCapability("can_view_finance"), cashflow.projectInvoice);
 
 /* ── Daily logs ───────────────────────────────────────────────────────── */
 router.get ("/:pid/daily-logs", Auth, projectAccess("any"), collab.listDailyLogs);

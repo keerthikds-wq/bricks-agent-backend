@@ -199,6 +199,27 @@ async function mirrorProjectPayment(payment, project) {
  */
 async function accrueWagesForLog(log, project) {
     const money = require("../Utils/money");
+
+    // Attendance wins.
+    //
+    // There are two ways to record labour on a day now: this log's headcounts
+    // ("mason × 4"), and per-person attendance. Both accrue wages, so without
+    // this a project running both would bill the builder twice for one day's
+    // work — and the more precise record is the one that should count, because
+    // it knows who was there and can carry per-person rates.
+    //
+    // Required here rather than at module scope: attendance.js pulls in the
+    // ledger for its own accrual, and a top-level pair would be a require cycle.
+    const { hasAttendance } = require("./attendance");
+    if (await hasAttendance(log.project_id, log.log_date)) {
+        return {
+            accrued: 0,
+            accrued_paise: 0,
+            missing_rates: [],
+            superseded_by: "attendance",
+        };
+    }
+
     const missing = [];
     const rowTotals = [];
 

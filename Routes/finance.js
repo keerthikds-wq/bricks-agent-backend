@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const ledger = require("../Controller/ledger");
+const cashflow = require("../Controller/cashflow");
 const { verifyTokenwithAuthorization } = require("../Middleware");
 const attachRole = require("../Middleware/attachRole");
 
@@ -23,5 +24,6 @@ const financeRoles = (req, res, next) =>
           });
 
 router.get("/overview", Auth, financeRoles, ledger.financeOverview);
+router.get("/cashflow", Auth, financeRoles, cashflow.cashflow);
 
 module.exports = router;

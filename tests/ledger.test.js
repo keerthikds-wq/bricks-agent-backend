@@ -439,6 +439,185 @@ const eq = (n, actual, expected) =>
         askDown.status !== 500,
         `got ${askDown.status} — a provider failure leaked as a 500`);
 
+    // ── Attendance ──────────────────────────────────────────────────────────
+    //
+    // The thing worth testing here is not that a sheet saves. It is that a day
+    // recorded two ways is charged once.
+    console.log('\n─── Attendance: roster and wages ────────────────────────────');
+
+    const w1 = await api.post('/api/workers').set(auth(B))
+        .send({ name: 'Ramesh', trade: 'mason' });
+    check('builder can add a worker', w1.status === 201, `got ${w1.status}`);
+
+    const w2 = await api.post('/api/workers').set(auth(B))
+        .send({ name: 'Suresh', trade: 'helper', daily_rate: 700 });
+    check('a per-person rate override is accepted', w2.status === 201,
+        `got ${w2.status}`);
+
+    const staffRoster = await api.get('/api/workers').set(auth(S));
+    check('field staff cannot read the roster (403)', staffRoster.status === 403,
+        `got ${staffRoster.status} — per-person pay is commercial`);
+
+    // A fresh project, so this day's wages are not tangled with the fixtures
+    // already posted against `project`.
+    const pA = await Project.create({
+        builder_id: builder._id, name: 'Attendance Site', address: 'A',
+        area_sqft: 900, floors: 1, budget: 800000,
+    });
+    const PA = `/api/projects/${pA._id}`;
+    const today = new Date().toISOString();
+
+    const sheet = await api.post(`${PA}/attendance`).set(auth(B)).send({
+        date: today,
+        entries: [
+            { worker_id: w1.body.data._id, status: 'present' },       // mason 900
+            { worker_id: w2.body.data._id, status: 'half_day' },      // 700 / 2
+        ],
+    });
+    check('a day can be marked', sheet.status === 201, `got ${sheet.status}`);
+    // 900 + 350. The override wins over the helper trade rate of 600.
+    eq('wages use the per-person rate where set',
+        sheet.body.data?.accrued_paise, 125000);
+
+    // Re-marking must replace, not append. A supervisor on a bad connection
+    // tapping Save twice is the common case, not the edge case.
+    const again = await api.post(`${PA}/attendance`).set(auth(B)).send({
+        date: today,
+        entries: [
+            { worker_id: w1.body.data._id, status: 'present' },
+            { worker_id: w2.body.data._id, status: 'half_day' },
+        ],
+    });
+    eq('re-marking the same day does not double the wages',
+        again.body.data?.accrued_paise, 125000);
+
+    const wageEntries = await LedgerEntry.countDocuments({
+        project_id: pA._id, category: 'labour_wage', is_delete: 0,
+    });
+    eq('and leaves exactly one wage entry for the day', wageEntries, 1);
+
+    // THE double-count rule: a daily log posted for a date that already has
+    // attendance must not accrue a second wage bill.
+    const dupLog = await api.post(`${PA}/daily-logs`).set(auth(B)).send({
+        log_date: today,
+        labour: [{ trade: 'mason', count: 10, hours: 8 }],
+        work_done: 'Same day, counted twice',
+    });
+    check('the log still posts', dupLog.status === 201, `got ${dupLog.status}`);
+    eq('but accrues nothing, because attendance already priced the day',
+        dupLog.body.data?.wages?.accrued_paise, 0);
+    eq('and says why', dupLog.body.data?.wages?.superseded_by, 'attendance');
+
+    const stillOne = await LedgerEntry.countDocuments({
+        project_id: pA._id, category: 'labour_wage', is_delete: 0,
+    });
+    eq('the day is still charged exactly once', stillOne, 1);
+
+    // Absent is a fact, not a gap.
+    const absentDay = new Date(Date.now() - 864e5).toISOString();
+    const abs = await api.post(`${PA}/attendance`).set(auth(B)).send({
+        date: absentDay,
+        entries: [{ worker_id: w1.body.data._id, status: 'absent' }],
+    });
+    eq('an absent day costs nothing', abs.body.data?.accrued_paise, 0);
+
+    const future = await api.post(`${PA}/attendance`).set(auth(B)).send({
+        date: new Date(Date.now() + 3 * 864e5).toISOString(),
+        entries: [{ worker_id: w1.body.data._id, status: 'present' }],
+    });
+    check('attendance cannot be marked for the future (400)',
+        future.status === 400, `got ${future.status}`);
+
+    const sheetGet = await api.get(`${PA}/attendance`).set(auth(B))
+        .query({ date: today });
+    check('the sheet lists every active worker, marked or not',
+        (sheetGet.body.data?.sheet || []).length >= 2,
+        `got ${(sheetGet.body.data?.sheet || []).length}`);
+    eq('and totals the day', sheetGet.body.data?.total_paise, 125000);
+
+    const summ = await api.get(`${PA}/attendance/summary`).set(auth(B));
+    check('per-worker summary responds', summ.status === 200, `got ${summ.status}`);
+    check('half days count as half a day worked',
+        (summ.body.data?.people || []).some((p) => p.days_worked === 0.5),
+        `got ${JSON.stringify((summ.body.data?.people || []).map((p) => p.days_worked))}`);
+
+    const summStaff = await api.get(`${PA}/attendance/summary`).set(auth(S));
+    check('field staff cannot read the payroll summary (403)',
+        summStaff.status === 403, `got ${summStaff.status} — it names earnings`);
+
+    // ── Cash flow ───────────────────────────────────────────────────────────
+    console.log('\n─── Cash flow forecasts from due dates ──────────────────────');
+
+    // Baseline first. Cash flow spans every project the builder can see, and
+    // earlier fixtures already left undated pending bills on other sites — so
+    // absolute totals here would assert the fixtures, not the forecast.
+    const cfBase = (await api.get('/api/finance/cashflow').set(auth(B))
+        .query({ weeks: 8 })).body.data;
+
+    const inTwoWeeks = new Date(Date.now() + 14 * 864e5).toISOString();
+    await api.post(`${PA}/ledger`).set(auth(B)).send({
+        direction: 'in', category: 'client_payment', amount: 500000,
+        status: 'pending', due_date: inTwoWeeks,
+        occurred_on: new Date().toISOString(),
+    });
+    // No due date — real money, no committed date.
+    await api.post(`${PA}/ledger`).set(auth(B)).send({
+        direction: 'out', category: 'material_bill', amount: 120000,
+        status: 'pending', occurred_on: new Date().toISOString(),
+    });
+    // Already late.
+    await api.post(`${PA}/ledger`).set(auth(B)).send({
+        direction: 'out', category: 'transport', amount: 40000,
+        status: 'pending', due_date: new Date(Date.now() - 10 * 864e5).toISOString(),
+        occurred_on: new Date(Date.now() - 20 * 864e5).toISOString(),
+    });
+
+    const cf = await api.get('/api/finance/cashflow').set(auth(B)).query({ weeks: 8 });
+    check('cash flow responds', cf.status === 200, `got ${cf.status}`);
+    const CF = cf.body.data;
+    eq('one bucket per week of the horizon', (CF?.series || []).length, 8);
+    // Compared in paise, not rupees.
+    //
+    // Subtracting the rupee doubles gave 120000.00000000001 — the exact float
+    // drift this codebase carries integer paise to avoid. A test that reaches
+    // for the display field instead of the authoritative one is reintroducing
+    // the bug it is meant to guard.
+    eq('an amount due in a fortnight lands in week 2',
+        (CF?.series?.[2]?.in_paise || 0) - (cfBase?.series?.[2]?.in_paise || 0),
+        50000000);
+    eq('money already past due is reported as overdue, not forecast',
+        (CF?.overdue?.outgoing_paise || 0) - (cfBase?.overdue?.outgoing_paise || 0),
+        4000000);
+    eq('and a bill with no due date is unscheduled, not assumed to be today',
+        (CF?.unscheduled?.outgoing_paise || 0) - (cfBase?.unscheduled?.outgoing_paise || 0),
+        12000000);
+    eq('the undated bill never reaches a forecast bucket',
+        (CF?.series?.[0]?.out_paise || 0) - (cfBase?.series?.[0]?.out_paise || 0), 0);
+
+    const cfStaff = await api.get('/api/finance/cashflow').set(auth(S));
+    check('field staff cannot see the cash forecast (403)',
+        cfStaff.status === 403, `got ${cfStaff.status}`);
+
+    // ── Invoice ─────────────────────────────────────────────────────────────
+    console.log('\n─── Invoice is derived from the ledger ──────────────────────');
+    const inv = await api.get(`${P}/invoice`).set(auth(B));
+    check('invoice responds', inv.status === 200, `got ${inv.status}`);
+    const INV = inv.body.data;
+
+    check('only client-facing money appears',
+        (INV?.lines || []).length > 0, 'no lines');
+    const derived = (INV?.lines || []).reduce((s, l) => s + l.amount_paise, 0);
+    eq('the total equals the sum of its lines', INV?.billed_paise, derived);
+    eq('balance is billed minus received',
+        INV?.balance_paise, (INV?.billed_paise || 0) - (INV?.received_paise || 0));
+    check('no supplier bill leaks onto the client statement',
+        !(INV?.lines || []).some((l) => /material|transport|wage/i.test(l.description || '')),
+        `got ${JSON.stringify((INV?.lines || []).map((l) => l.description))}`);
+
+    const invStaff = await api.get(`${P}/invoice`).set(auth(S));
+    check('field staff cannot pull the client invoice (403)',
+        invStaff.status === 403, `got ${invStaff.status}`);
+
     console.log('\n─── Reconcile is idempotent ─────────────────────────────────');
     const before2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     await api.post(`${P}/ledger/reconcile`).set(auth(B)).send({});

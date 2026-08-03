@@ -133,10 +133,18 @@ const ledgerEntrySchema = new Schema(
          */
         source: {
             type: String,
-            enum: ["manual", "project_payment", "daily_log"],
+            enum: ["manual", "project_payment", "daily_log", "attendance"],
             default: "manual",
             index: true,
         },
+
+        /**
+         * The document this mirrors, where there is exactly one.
+         *
+         * Left unset for `attendance`, which has no single source document: a
+         * day's wages are the sum of one record per worker. That entry is keyed
+         * on (source, project_id, occurred_on) by the index below instead.
+         */
         source_ref: { type: Schema.Types.ObjectId, index: true },
 
         created_by: { type: Schema.Types.ObjectId, ref: "user" },
@@ -154,6 +162,23 @@ ledgerEntrySchema.index({ builder_id: 1, occurred_on: -1 });
 ledgerEntrySchema.index(
     { source: 1, source_ref: 1 },
     { unique: true, partialFilterExpression: { source_ref: { $exists: true } } }
+);
+
+/**
+ * One attendance wage entry per project per day.
+ *
+ * Attendance has no single source document to point `source_ref` at — a day's
+ * wages are the sum of one record per worker — so the day itself is the key.
+ * Without this, re-marking a sheet would append a second wage bill for the same
+ * day instead of replacing the first, which is exactly the double-charge the
+ * attendance-wins rule exists to prevent.
+ */
+ledgerEntrySchema.index(
+    { source: 1, project_id: 1, occurred_on: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { source: "attendance", is_delete: 0 },
+    }
 );
 
 /**
