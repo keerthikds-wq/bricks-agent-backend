@@ -217,11 +217,37 @@ const otpVerifyLogin = async (req, res, next) => {
     //
     // This was hardcoded to "0000" with a "remove before production" comment,
     // which means ANY phone number could be logged into by anyone who knew it —
-    // a full account-takeover backdoor sitting in the live build. It is now
-    // opt-in via env and refuses to arm itself in production, so the default
-    // deployment has no bypass at all. Set MASTER_OTP locally for testing.
-    const MASTER_OTP =
-        process.env.NODE_ENV === 'production' ? null : (process.env.MASTER_OTP || null);
+    // a full account-takeover backdoor sitting in the live build. It is opt-in
+    // via env, so the default deployment has no bypass at all.
+    //
+    // ── Why NODE_ENV is no longer the switch ─────────────────────────────────
+    //
+    // It used to be disarmed whenever NODE_ENV === 'production'. That read as
+    // safe and was, but it also locked this deployment out completely: Render
+    // sets NODE_ENV=production by default, and with no SMS provider wired up
+    // the real OTP can never arrive either. Nobody could sign in at all — not
+    // even to reach the registration screen, which the app gates behind OTP.
+    //
+    // The honest fix is a switch that means what it says. ALLOW_MASTER_OTP has
+    // exactly one purpose and cannot be set by accident, whereas NODE_ENV is
+    // set by the platform for unrelated reasons and also governs error
+    // verbosity, view caching and cookie flags — so forcing it to 'development'
+    // to get a test login would quietly change several other things.
+    //
+    // Still default-deny: BOTH vars must be present. Leave ALLOW_MASTER_OTP
+    // unset for any deployment with real users on it.
+    const bypassArmed = process.env.ALLOW_MASTER_OTP === 'true';
+    const MASTER_OTP = bypassArmed ? (process.env.MASTER_OTP || null) : null;
+
+    if (MASTER_OTP) {
+        // Loud, every time. A bypass nobody is reminded about is a bypass that
+        // survives to launch — which is precisely how the hardcoded "0000" got
+        // this far.
+        console.warn(
+            '[SECURITY] Master OTP bypass is ARMED. Anyone who knows a phone ' +
+            'number can sign in as that user. Unset ALLOW_MASTER_OTP before ' +
+            'real users exist on this deployment.');
+    }
 
     try {
         if (MASTER_OTP && String(otp) === String(MASTER_OTP)) {

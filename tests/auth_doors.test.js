@@ -133,6 +133,60 @@ function collectPaths(stack, prefix = '') {
         check(`${p} still reachable`, res.status !== 410, `got 410 — the guard is too greedy`);
     }
 
+    // ── 4. The master-OTP bypass is default-deny ─────────────────────────────
+    //
+    // Both directions matter. Armed by accident it is a full account-takeover
+    // backdoor on a public URL; disarmed with no SMS provider it locks everyone
+    // out of a test deployment, which is exactly what happened when the gate
+    // was NODE_ENV and the host set that to production by itself.
+    console.log('\n─── Master OTP is off unless deliberately armed ─────────────');
+    const User = require(path.join(REPO, 'Model/User'));
+    await User.create({
+        name: 'Bypass Probe', phone: '9700000001', pincode: '500001',
+        role: 'builder',
+    });
+
+    const tryOtp = () => request(app)
+        .post('/api/auth/login/otp-verify')
+        .send({ phone: '9700000001', otp: '0000' });
+
+    delete process.env.ALLOW_MASTER_OTP;
+    process.env.MASTER_OTP = '0000';
+    let res = await tryOtp();
+    check('MASTER_OTP alone does not arm the bypass',
+        !(res.body && res.body.token),
+        'a token was minted with ALLOW_MASTER_OTP unset — THIS IS AN AUTH BYPASS');
+
+    process.env.ALLOW_MASTER_OTP = 'false';
+    res = await tryOtp();
+    check('ALLOW_MASTER_OTP=false does not arm it either',
+        !(res.body && res.body.token),
+        'a token was minted — only the exact string "true" may arm this');
+
+    process.env.ALLOW_MASTER_OTP = 'true';
+    delete process.env.MASTER_OTP;
+    res = await tryOtp();
+    check('the flag alone, with no code set, arms nothing',
+        !(res.body && res.body.token),
+        'a token was minted with no MASTER_OTP value');
+
+    process.env.ALLOW_MASTER_OTP = 'true';
+    process.env.MASTER_OTP = '0000';
+    res = await tryOtp();
+    check('both set together DOES let a tester in',
+        !!(res.body && res.body.token),
+        `no token — the escape hatch does not work, so a test deployment with ` +
+        `no SMS provider is unusable. status ${res.status}`);
+
+    res = await request(app).post('/api/auth/login/otp-verify')
+        .send({ phone: '9700000001', otp: '1234' });
+    check('and a wrong code is still refused while armed',
+        !(res.body && res.body.token),
+        'any OTP was accepted — the bypass is matching too loosely');
+
+    delete process.env.ALLOW_MASTER_OTP;
+    delete process.env.MASTER_OTP;
+
     console.log('\n' + '='.repeat(62));
     console.log(`  ${pass} passed, ${fail} failed`);
     if (fail) {
