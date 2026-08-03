@@ -618,6 +618,94 @@ const eq = (n, actual, expected) =>
     check('field staff cannot pull the client invoice (403)',
         invStaff.status === 403, `got ${invStaff.status}`);
 
+    // ── Material market intelligence ────────────────────────────────────────
+    //
+    // The point is not that it returns prices. It is that it compares the
+    // market to what THIS builder actually pays, and never substitutes one for
+    // the other.
+    console.log('\n─── Materials: my rate vs the market ────────────────────────');
+    const PriceTrend = require(path.join(REPO, 'Model/PriceTrend'));
+
+    // plywood, because earlier fixtures in this file already buy cement, steel
+    // and sand — asserting on those would be asserting on the fixtures.
+    await PriceTrend.create({
+        material: 'plywood', price: 100, unit: 'per sheet',
+        recorded_at: new Date(Date.now() - 60 * 864e5),
+    });
+    await PriceTrend.create({
+        material: 'plywood', price: 110, unit: 'per sheet',
+        recorded_at: new Date(),
+    });
+    // Tracked by the market, never bought by this builder.
+    await PriceTrend.create({
+        material: 'paint', price: 250, unit: 'per litre', recorded_at: new Date(),
+    });
+    // Priced per kg by the market, bought per bundle by the builder.
+    await PriceTrend.create({
+        material: 'tmt_bars', price: 52, unit: 'per kg', recorded_at: new Date(),
+    });
+
+    await api.post(`${PA}/ledger`).set(auth(B)).send({
+        direction: 'out', category: 'material_bill', status: 'settled',
+        occurred_on: new Date().toISOString(),
+        description: 'Site materials',
+        line_items: [
+            // 50 sheets at 121 — above the 110 market, same unit.
+            { name: 'Plywood 12mm board', qty: 50, unit: 'sheet', rate: '121.00' },
+            // Bundles against a per-kg market price: not comparable.
+            { name: 'TMT bars 12mm', qty: 4, unit: 'bundle', rate: '4150.00' },
+        ],
+    });
+
+    const mi = await api.get('/api/materials/intelligence').set(auth(B))
+        .query({ days: 90 });
+    check('materials intelligence responds', mi.status === 200, `got ${mi.status}`);
+    const MI = mi.body.data;
+    const ply = (MI?.materials || []).find((m) => m.material === 'plywood');
+
+    check('a free-text bill line is matched to its material',
+        !!ply && ply.bill_lines === 1, `got ${JSON.stringify(ply)}`);
+    eq('my rate is what I actually paid, not the market rate',
+        ply?.my_rate_paise, 12100);
+    eq('market price is tracked separately', ply?.market_paise, 11000);
+    // Movement is computed, but not asserted to an exact figure: the app seeds
+    // its own price history on boot, so the earliest point in the window is not
+    // necessarily the one this test inserted. Asserting 10% here would be
+    // asserting the seeder.
+    check('market movement is computed over the window',
+        typeof ply?.change_pct === 'number',
+        `got ${ply?.change_pct}`);
+    eq('and the variance says I am paying over the odds',
+        ply?.variance_pct, 10);                                   // 121 vs 110
+    check('overpayment is surfaced as a headline',
+        (MI?.overpaying || []).some((m) => m.material === 'plywood'),
+        `got ${JSON.stringify(MI?.overpaying)}`);
+
+    // The rule that matters most: a material the builder has never itemised
+    // must report null, not the market price dressed up as their own.
+    const paint = (MI?.materials || []).find((m) => m.material === 'paint');
+    check('a never-purchased material reports no rate of my own',
+        !!paint && paint.my_rate_paise === null,
+        `got ${JSON.stringify(paint)}`);
+    check('and says why rather than leaving a bare null',
+        (paint?.note || '').length > 0, `got "${paint?.note}"`);
+    check('its variance is null, not zero',
+        paint?.variance_pct === null, `got ${paint?.variance_pct}`);
+
+    // Regression: without a unit check this reported the builder as 7882% over
+    // market, because ₹4,150 per bundle was divided by ₹52 per kg. A confident
+    // wrong number on the headline would have sunk trust in the whole screen.
+    const tmt = (MI?.materials || []).find((m) => m.material === 'tmt_bars');
+    check('rates in different units are not compared',
+        !!tmt && tmt.variance_pct === null,
+        `got ${JSON.stringify(tmt)}`);
+    check('and the reason names both units',
+        /bundle/.test(tmt?.note || '') && /kg/.test(tmt?.note || ''),
+        `got "${tmt?.note}"`);
+    check('an incomparable material never reaches the overpaying headline',
+        !(MI?.overpaying || []).some((m) => m.material === 'tmt_bars'),
+        `got ${JSON.stringify(MI?.overpaying)}`);
+
     console.log('\n─── Reconcile is idempotent ─────────────────────────────────');
     const before2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     await api.post(`${P}/ledger/reconcile`).set(auth(B)).send({});
