@@ -5,6 +5,7 @@ const Milestone      = require("../Model/Milestone");
 const ProjectPayment = require("../Model/ProjectPayment");
 const ProjectUpdate  = require("../Model/ProjectUpdate");
 const Approval       = require("../Model/Approval");
+const DailyLog       = require("../Model/DailyLog");
 const User           = require("../Model/User");
 
 const { visibleProjectFilter, callerId } = require("../Middleware/projectAccess");
@@ -425,6 +426,55 @@ exports.dashboard = async (req, res) => {
             Approval.countDocuments({ project_id: { $in: ids }, status: "pending", is_delete: 0 }),
         ]);
 
+        // Per-project headcount and next milestone.
+        //
+        // A project card that shows only progress and budget is a progress bar
+        // with a name on it. What makes it worth looking at is whether anyone
+        // is on that site today and what is due next — and neither lives on the
+        // Project document, so the card could not show them however it was
+        // designed.
+        //
+        // Two grouped aggregations for the whole set rather than a query per
+        // card: at 50 projects the naive version is 100 round trips to render
+        // one screen.
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const [todayLogs, nextMilestones] = await Promise.all([
+            ids.length
+                ? DailyLog.aggregate([
+                      { $match: { project_id: { $in: ids }, is_delete: 0, log_date: { $gte: startOfToday } } },
+                      { $group: { _id: "$project_id", workers: { $sum: "$total_workers" } } },
+                  ])
+                : [],
+            ids.length
+                ? Milestone.find({
+                      project_id: { $in: ids }, completed: false, is_delete: 0,
+                      due_date: { $ne: null },
+                  }).sort({ due_date: 1 }).select("project_id title due_date").lean()
+                : [],
+        ]);
+
+        const workersBy = new Map(todayLogs.map((r) => [String(r._id), r.workers || 0]));
+        const nextBy = new Map();
+        for (const m of nextMilestones) {
+            // Sorted by due date, so the first one seen per project is the next
+            // one due.
+            const k = String(m.project_id);
+            if (!nextBy.has(k)) nextBy.set(k, { title: m.title, due_date: m.due_date });
+        }
+
+        const decorate = (p) => ({
+            ...p,
+            // Absent rather than 0 when nobody logged: "no report yet" and
+            // "nobody turned up" are different facts, and the card says so.
+            workers_today: workersBy.has(String(p._id)) ? workersBy.get(String(p._id)) : null,
+            next_milestone: nextBy.get(String(p._id)) || null,
+            // The phase actually underway, so the card can name the stage
+            // without the app re-deriving it from the phases array.
+            current_stage: (p.phases || []).find((ph) => ph.status === "in_progress")?.name || null,
+        });
+
         const payload = {
             role,
             projects_count:  projects.length,
@@ -432,7 +482,7 @@ exports.dashboard = async (req, res) => {
             recent_updates:  recentUpdates,
             upcoming_milestones: upcomingMilestones,
             pending_approvals:   pendingApprovals,
-            projects: projects.slice(0, 5),
+            projects: projects.slice(0, 5).map(decorate),
         };
 
         // Money is builder + client only.
