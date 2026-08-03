@@ -68,6 +68,33 @@ exports.rates = async (req, res) => {
             previous.map((p) => [p.material, p.price])
         );
 
+        // The recent run of points, for the sparkline and the last-move figure.
+        //
+        // A single price plus a month-old comparison answers "is it higher than
+        // it was" and nothing else. What a builder buying this week needs is
+        // the shape — whether it has been climbing steadily or jumped
+        // yesterday — and those are the same number with very different
+        // meanings.
+        //
+        // One query for every material in the window rather than one per
+        // material: this is a handful of documents per material per month, so
+        // grouping in memory is cheaper than nine round trips.
+        const windowStart = new Date(Date.now() - 30 * 86400000);
+        const recent = await PriceTrend.find({
+            region,
+            recorded_at: { $gte: windowStart },
+        })
+            .sort({ recorded_at: 1 })
+            .select("material price recorded_at")
+            .lean();
+
+        const seriesBy = new Map();
+        for (const p of recent) {
+            const arr = seriesBy.get(p.material) || [];
+            arr.push({ price: p.price, at: p.recorded_at });
+            seriesBy.set(p.material, arr);
+        }
+
         const items = latest.map((d) => {
             const shaped = shapeRate(d);
             const before = prevByMaterial[d.material];
@@ -77,6 +104,23 @@ exports.rates = async (req, res) => {
                 // No comparison point — say nothing rather than imply "flat".
                 shaped.change_pct = null;
             }
+
+            const series = seriesBy.get(d.material) || [];
+            // Trimmed to the last 14 points: enough to show a shape at
+            // thumbnail size, few enough that each one is still a visible step.
+            shaped.series = series.slice(-14).map((s) => s.price);
+
+            // The most recent MOVE, which is not the same as the monthly one.
+            // Null when there is only one reading — a single point has not
+            // moved, and reporting 0% would claim it held steady.
+            const prevPoint = series.length >= 2 ? series[series.length - 2] : null;
+            shaped.previous_price = prevPoint ? prevPoint.price : null;
+            shaped.previous_at = prevPoint ? prevPoint.at : null;
+            shaped.change_pct_recent =
+                prevPoint && prevPoint.price > 0
+                    ? Math.round(((d.price - prevPoint.price) / prevPoint.price) * 1000) / 10
+                    : null;
+
             return shaped;
         });
 
