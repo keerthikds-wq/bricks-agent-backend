@@ -246,7 +246,10 @@ exports.markPaid = async (req, res) => {
 // POST /api/projects/:pid/approvals   (builder or client)
 exports.createApproval = async (req, res) => {
     try {
-        const { title, description, category, cost_delta, attachments } = req.body;
+        const {
+            title, description, category, cost_delta, attachments,
+            priority, needed_by,
+        } = req.body;
         if (!title) return fail(res, 400, "Title is required");
 
         const me = await User.findById(callerId(req)).select("name").lean();
@@ -258,6 +261,13 @@ exports.createApproval = async (req, res) => {
             category:       category || "change",
             cost_delta:     Number(cost_delta) || 0,
             attachments:    Array.isArray(attachments) ? attachments : [],
+            // Unknown values fall back to the default rather than being
+            // rejected: an approval that fails to save because a client sent
+            // "high" instead of "urgent" is worse than one filed as normal.
+            priority: ["low", "normal", "urgent"].includes(priority)
+                ? priority
+                : "normal",
+            needed_by: needed_by ? new Date(needed_by) : null,
             raised_by:      callerId(req),
             raised_by_name: me?.name || "",
             raised_by_role: req.projectRole,

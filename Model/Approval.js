@@ -31,6 +31,28 @@ const approvalSchema = new Schema(
 
         attachments: { type: [String], default: [] },   // Cloudinary secure_urls
 
+        /**
+         * How much this is holding up.
+         *
+         * Set by whoever raises it, because they are the only one who knows
+         * whether the site is standing idle waiting for the answer. Without
+         * this, a decision queue is ordered by date alone and a tile choice
+         * outranks a slab that cannot be poured.
+         */
+        priority: {
+            type: String,
+            enum: ["low", "normal", "urgent"],
+            default: "normal",
+            index: true,
+        },
+
+        /**
+         * When an answer is needed by. Null means "no stated deadline", which
+         * is different from "due today" and must stay distinguishable — the app
+         * shows time remaining only when there is a date to count to.
+         */
+        needed_by: { type: Date, default: null },
+
         status: {
             type: String,
             enum: ["pending", "approved", "rejected", "withdrawn"],
