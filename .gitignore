@@ -34,3 +34,13 @@ build/
 Thumbs.db
 seed_assets/
 backups/
+
+# Firebase service-account keys. Utils/config.json held a live private key
+# in a public repo until the account behind it was deleted.
+Utils/config.json
+Utils/new_config.json
+firebase-service-account.json
+
+# FindMyFuture restore scripts that ended up in this working directory.
+# Left on disk, kept out of the BricksAgent repo.
+scripts_fmf_*.js

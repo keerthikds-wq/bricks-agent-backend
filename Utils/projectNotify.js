@@ -15,19 +15,12 @@ const User                = require("../Model/User");
  * handler — a failed notification must not fail the write that triggered it.
  */
 
-let _fcmReady = false;
+// Credential resolution lives in Utils/firebase.js — see the note there on why
+// this stopped being `require("./config.json")` and why "initialised" is not
+// the same thing as "able to authenticate".
+const { getApp } = require("./firebase");
 function _initFcm() {
-    if (_fcmReady) return true;
-    try {
-        if (!admin.apps.length) {
-            const serviceAccount = require("./config.json");
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-        }
-        _fcmReady = true;
-    } catch (e) {
-        console.error("projectNotify: FCM init failed (non-fatal):", e.message);
-    }
-    return _fcmReady;
+    return getApp() !== null;
 }
 
 async function _push(token, title, body, data = {}) {

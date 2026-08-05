@@ -8,15 +8,21 @@ const User=require("../Model/User")
 const Seller=require("../Model/Seller")
 const {v4: uuid} = require('uuid');
 
-var serviceAccount=require("../Utils/config.json")
-if (!admin.apps.length) {
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+// Resolved lazily through Utils/firebase.js rather than required at the top of
+// the file.
+//
+// A bare `require("../Utils/config.json")` here meant a missing credential took
+// the whole server down at boot — this module is reached from Routes/index.js,
+// so the file not being present is an unhandled throw during startup, not a
+// degraded notification. Credentials belong in the environment and are allowed
+// to be absent; the API must still serve.
+const { getApp } = require("../Utils/firebase");
 
 // ─── Shared helper: send one FCM message via firebase-admin ──────────────────
 // Returns true on success, false on failure (never throws).
 async function _sendFcm(token, title, body, extraData = {}) {
     if (!token || token === 'user_logged_out') return false;
+    if (!getApp()) return false;
     try {
         await admin.messaging().send({
             notification: { title, body },
