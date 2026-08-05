@@ -213,57 +213,25 @@ const emailVerify = async (req, res, next) => {
 const otpVerifyLogin = async (req, res, next) => {
     const { phone, otp } = req.body;
 
-    // Master OTP bypass.
+    // The master-OTP bypass is gone.
     //
-    // This was hardcoded to "0000" with a "remove before production" comment,
-    // which means ANY phone number could be logged into by anyone who knew it —
-    // a full account-takeover backdoor sitting in the live build. It is opt-in
-    // via env, so the default deployment has no bypass at all.
+    // It began as a hardcoded "0000" with a "remove before production" comment,
+    // which meant any phone number could be signed into by anyone who knew it.
+    // It was then put behind ALLOW_MASTER_OTP so the default deployment had no
+    // bypass — but a backdoor behind an env var is still a backdoor, and it only
+    // existed because the SMS provider had been retired and there was genuinely
+    // no other way in.
     //
-    // ── Why NODE_ENV is no longer the switch ─────────────────────────────────
+    // There is now: /api/auth/firebase. Firebase both delivers the code and
+    // vouches for the result, so nothing here needs a way to skip the check.
+    // Removing it also removes the risk that the flag is set once for a demo
+    // and never unset.
     //
-    // It used to be disarmed whenever NODE_ENV === 'production'. That read as
-    // safe and was, but it also locked this deployment out completely: Render
-    // sets NODE_ENV=production by default, and with no SMS provider wired up
-    // the real OTP can never arrive either. Nobody could sign in at all — not
-    // even to reach the registration screen, which the app gates behind OTP.
-    //
-    // The honest fix is a switch that means what it says. ALLOW_MASTER_OTP has
-    // exactly one purpose and cannot be set by accident, whereas NODE_ENV is
-    // set by the platform for unrelated reasons and also governs error
-    // verbosity, view caching and cookie flags — so forcing it to 'development'
-    // to get a test login would quietly change several other things.
-    //
-    // Still default-deny: BOTH vars must be present. Leave ALLOW_MASTER_OTP
-    // unset for any deployment with real users on it.
-    const bypassArmed = process.env.ALLOW_MASTER_OTP === 'true';
-    const MASTER_OTP = bypassArmed ? (process.env.MASTER_OTP || null) : null;
-
-    if (MASTER_OTP) {
-        // Loud, every time. A bypass nobody is reminded about is a bypass that
-        // survives to launch — which is precisely how the hardcoded "0000" got
-        // this far.
-        console.warn(
-            '[SECURITY] Master OTP bypass is ARMED. Anyone who knows a phone ' +
-            'number can sign in as that user. Unset ALLOW_MASTER_OTP before ' +
-            'real users exist on this deployment.');
-    }
+    // This endpoint stays only for handsets running an older build. It cannot
+    // succeed — nothing writes an Otp row any more — and that is the intended
+    // outcome: an old app should fail to sign in rather than sign in weakly.
 
     try {
-        if (MASTER_OTP && String(otp) === String(MASTER_OTP)) {
-            const user = await User.findOne({ phone, is_delete: 0 });
-            if (user) {
-                const token = jwt.sign({
-                    id: user._id,
-                    email: user.email,
-                    phone: user.phone,
-                    isUser: user.isUser,
-                }, process.env.SECRET, { expiresIn: "3d" });
-                return res.send({ "status": 200, "data": user, "exist": true, token, "message": "Otp verified successfully", "error": false });
-            }
-            return res.send({ "status": 200, "data": null, "exist": false, "message": "Otp verified successfully", "error": false });
-        }
-
         const o = await Otp.findOne({ phone, "is_delete": 0 });
         if (!o) {
             return res.status(401).send({ "status": 401, "data": null, "message": "OTP not found or already used. Please request a new OTP.", "error": true });
