@@ -498,26 +498,45 @@ exports.dashboard = async (req, res) => {
             // outstanding, am I heading over budget on committed cost rather
             // than on cash already gone. All of it comes from one aggregation
             // over the ledger so the figures cannot disagree with each other.
-            const { positionFor } = require("./ledger");
+            const { positionFor, forClient } = require("./ledger");
             const position = await positionFor(ids);
 
-            payload.finance = {
-                ...position,
-                // Cost committed whether or not it has been paid. This is the
-                // number that warns of an overrun; `spent` reports it too late.
-                committed: position.paid + position.payable,
-                budget_remaining: payload.total_budget - (position.paid + position.payable),
-            };
+            if (role === "client") {
+                // The owner gets the shared ledger, not the builder's purchase
+                // book. See ledger.forClient for why this is not a flag on the
+                // same object: `spent` and the cost categories would let an
+                // owner read the builder's margin straight off the screen.
+                payload.finance = {
+                    ...forClient(position),
+                    contract_value: payload.total_budget,
+                    balance: payload.total_budget - position.received,
+                    balance_paise:
+                        payload.total_budget * 100 - position.received_paise,
+                };
+                delete payload.total_spent;
 
-            // Flat aliases so a screen can read a single figure without
-            // destructuring, and so the names match what the app asks for.
-            payload.total_received   = position.received;
-            payload.total_receivable = position.receivable;
-            payload.total_paid       = position.paid;
-            payload.total_payable    = position.payable;
-            payload.outstanding      = position.receivable;
-            payload.wages_due        = position.wages_due;
-            payload.net_position     = position.net_position;
+                payload.total_received   = position.received;
+                payload.total_receivable = position.receivable;
+                payload.outstanding      = position.receivable;
+            } else {
+                payload.finance = {
+                    ...position,
+                    // Cost committed whether or not it has been paid. This is the
+                    // number that warns of an overrun; `spent` reports it too late.
+                    committed: position.paid + position.payable,
+                    budget_remaining: payload.total_budget - (position.paid + position.payable),
+                };
+
+                // Flat aliases so a screen can read a single figure without
+                // destructuring, and so the names match what the app asks for.
+                payload.total_received   = position.received;
+                payload.total_receivable = position.receivable;
+                payload.total_paid       = position.paid;
+                payload.total_payable    = position.payable;
+                payload.outstanding      = position.receivable;
+                payload.wages_due        = position.wages_due;
+                payload.net_position     = position.net_position;
+            }
         }
 
         if (role === "builder") {

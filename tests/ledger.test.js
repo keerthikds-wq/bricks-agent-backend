@@ -713,6 +713,49 @@ const eq = (n, actual, expected) =>
     const after2 = await LedgerEntry.countDocuments({ project_id: project._id, is_delete: 0 });
     eq('running reconcile twice adds nothing', after2, before2);
 
+    // ── What the owner is allowed to see ────────────────────────────────────
+    //
+    // The product depends on builders being willing to hand their clients a
+    // login. They will not, if the client can read what was paid for cement and
+    // subtract it from the contract to get the margin. So the owner's view is
+    // the SHARED ledger — contract value, what they have paid, what is being
+    // asked for next — and nothing about the builder's costs.
+    console.log('\n─── The owner sees the contract, not the cost sheet ─────────');
+
+    const cSum = (await api.get(`${P}/ledger/summary`).set(auth(C))).body.data;
+    for (const leak of ['paid', 'payable', 'wages_due', 'by_category',
+                        'by_category_paise', 'committed', 'net_position']) {
+        check(`summary withholds "${leak}"`, cSum[leak] === undefined,
+            `got ${JSON.stringify(cSum[leak])}`);
+    }
+    check('summary still answers what they have paid',
+        typeof cSum.paid_by_me === 'number', `got ${JSON.stringify(cSum)}`);
+    check('summary still answers what is being asked for',
+        typeof cSum.due_from_me === 'number', `got ${JSON.stringify(cSum)}`);
+    eq('and states the contract value', cSum.contract_value, 1000000);
+
+    const bSum = (await api.get(`${P}/ledger/summary`).set(auth(B))).body.data;
+    check('the builder still sees their own costs',
+        typeof bSum.paid === 'number' && bSum.by_category !== undefined,
+        `got ${JSON.stringify(bSum).slice(0, 160)}`);
+
+    const cRows = (await api.get(`${P}/ledger`).set(auth(C))).body.data || [];
+    check('the entry list hands the owner no outgoing rows',
+        cRows.every((r) => r.direction === 'in'),
+        `got ${cRows.filter((r) => r.direction !== 'in').length} "out" rows`);
+    check('and there is something left to show them', cRows.length > 0);
+
+    // The filter is applied after the query string is read, so asking for the
+    // supplier bills by name must not produce them either.
+    const cForced = (await api.get(`${P}/ledger?direction=out`).set(auth(C))).body.data || [];
+    check('asking for direction=out does not step around it',
+        cForced.every((r) => r.direction === 'in'),
+        `got ${cForced.filter((r) => r.direction !== 'in').length} "out" rows`);
+
+    const bRows = (await api.get(`${P}/ledger?direction=out`).set(auth(B))).body.data || [];
+    check('the builder can still list their own bills', bRows.length > 0,
+        `got ${bRows.length}`);
+
     console.log('\n' + '='.repeat(60));
     console.log(`  ${pass} passed, ${fail} failed`);
     if (fail) {

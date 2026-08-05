@@ -120,6 +120,44 @@ function shapePosition(acc) {
     };
 }
 
+/**
+ * The owner's view of the same position.
+ *
+ * ── Why this is not the builder's object with a flag ─────────────────────────
+ *
+ * `paid`, `payable`, `wages_due` and `by_category` are the builder's PURCHASE
+ * book — what they spent on cement, steel and labour. An owner who can see
+ * those can subtract them from the contract value and read the builder's
+ * margin off the screen.
+ *
+ * That is not transparency, it is a different product, and shipping it would
+ * make builders refuse to give their clients access at all — which kills the
+ * one feature the whole platform is built on. The owner gets the SHARED
+ * ledger: what the contract is worth, what they have paid, what is being asked
+ * for next. Every figure here is one they already know or are entitled to.
+ *
+ * Redacting on the way out rather than querying differently keeps one
+ * definition of each number, so the two views cannot disagree about what
+ * "received" means.
+ */
+function forClient(position) {
+    return {
+        received: position.received,
+        receivable: position.receivable,
+        received_paise: position.received_paise,
+        receivable_paise: position.receivable_paise,
+        receivable_count: position.receivable_count,
+
+        // Named from the owner's side of the table. "Received" is the builder's
+        // word for it; the person who wrote the cheque calls it paid.
+        paid_by_me: position.received,
+        paid_by_me_paise: position.received_paise,
+        due_from_me: position.receivable,
+        due_from_me_paise: position.receivable_paise,
+    };
+}
+module.exports.forClient = forClient;
+
 function emptyPosition() {
     return shapePosition({
         received: 0, receivable: 0, paid: 0, payable: 0, wages_due: 0,
@@ -292,6 +330,14 @@ exports.listEntries = async (req, res) => {
         const { direction, category, status, from, to } = req.query;
         const q = { project_id: req.project._id, is_delete: 0 };
         if (direction) q.direction = direction;
+
+        // An owner sees the money that moved between them and the builder, and
+        // nothing else. The "out" rows are supplier bills and wage sheets —
+        // showing them turns a transparency feature into a margin disclosure,
+        // which is the fastest way to make builders stop inviting their
+        // clients. Forced after the query params so `?direction=out` cannot
+        // step around it.
+        if (req.projectRole === "client") q.direction = "in";
         if (category) q.category = category;
         if (status) q.status = status;
         if (from || to) {
@@ -317,6 +363,16 @@ exports.projectSummary = async (req, res) => {
     try {
         const position = await positionFor([req.project._id]);
         const budget = req.project.budget || 0;
+
+        // The owner's summary is the contract, not the builder's cost sheet.
+        if (req.projectRole === "client") {
+            return ok(res, {
+                ...forClient(position),
+                contract_value: budget,
+                balance: budget - position.received,
+                balance_paise: budget * 100 - position.received_paise,
+            });
+        }
 
         return ok(res, {
             ...position,
