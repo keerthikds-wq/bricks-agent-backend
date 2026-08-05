@@ -34,7 +34,24 @@ module.exports = async function attachRole(req, res, next) {
         const id = req.user.id || req.user._id;
         if (!id) return next();
 
-        const u = await User.findById(id).select("role staff_type plan").lean();
+        const u = await User.findById(id).select("role staff_type plan session_epoch").lean();
+
+        // Has this session been ended since the token was signed?
+        //
+        // Checked here because this is the one place that already holds the
+        // user document, so revocation costs a comparison rather than a query.
+        // Tokens minted before session_epoch existed carry no `epoch` claim and
+        // are treated as epoch 0, which is the stored default — so nobody is
+        // signed out by the arrival of this check, only by an actual logout.
+        if (u && (req.user.epoch || 0) !== (u.session_epoch || 0)) {
+            return res.status(401).json({
+                status: 401,
+                message: "Session ended. Please sign in again.",
+                error: true,
+                code: "SESSION_REVOKED",
+            });
+        }
+
         if (u) {
             req.user.role = u.role || "client";
             req.user.staff_type = u.staff_type || null;

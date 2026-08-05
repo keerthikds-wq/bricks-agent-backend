@@ -119,4 +119,18 @@ async function verifyAtStartup() {
     }
 }
 
-module.exports = { getApp, verifyAtStartup };
+/**
+ * The Auth instance, or null when no credential is configured.
+ *
+ * Callers go through here rather than reaching for `admin.auth()` themselves.
+ * That keeps the null-credential case handled in one place, and it is the only
+ * seam a test can hold: firebase-admin exposes `auth` as a getter, so a test
+ * that tries to replace `admin.auth` finds the assignment silently ignored and
+ * spends an afternoon wondering why its mock never fires.
+ */
+function getAuth() {
+    const app = getApp();
+    return app ? admin.auth(app) : null;
+}
+
+module.exports = { getApp, getAuth, verifyAtStartup };

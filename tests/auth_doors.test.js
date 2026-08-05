@@ -35,6 +35,13 @@ const OPEN_BY_DESIGN = new Map([
     ['/api/auth/login',            'phone entry — the one way in'],
     ['/api/auth/login/otp-verify', 'completes the OTP login'],
     ['/api/auth/register',         'creates the single account type'],
+    // Unauthenticated by necessity — this is how a session is obtained — but
+    // not an open door. Both demand a Firebase ID token signed by Google and
+    // take the phone number out of the VERIFIED token, ignoring the body
+    // entirely, so neither can be called on behalf of a number the caller does
+    // not control. That is strictly more than /register has ever asked for.
+    ['/api/auth/firebase',          'exchanges a verified Firebase token for a session'],
+    ['/api/auth/firebase/register', 'creates the account for a Firebase-verified number'],
     ['/api/admin/login',           'admin panel publishes the catalogue'],
     ['/api/admin/otp-verify',      'admin login second factor'],
     ['/api/admin/forgot-password', 'admin recovery'],

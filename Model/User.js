@@ -78,6 +78,27 @@ const userSchema = new Schema(
         },
         legacy_id: { type: Schema.Types.ObjectId, default: null },
 
+        /**
+         * Bumped to end every session this account has open.
+         *
+         * ── Why sessions need an off switch ──────────────────────────────────
+         *
+         * Tokens were signed for three days and verified by signature alone —
+         * no lookup, no record — so there was no way to end one early. A phone
+         * left in an auto-rickshaw stayed logged in until the token aged out,
+         * and "log out" only destroyed a server session that JWT auth never
+         * consulted.
+         *
+         * Every token carries the epoch it was minted under. Raising this makes
+         * all of them stale at once, which is what "log out" and "I lost my
+         * phone" actually have to mean.
+         *
+         * The cost is one comparison against a document attachRole already
+         * loads, so revocation is effectively free on the routes that carry
+         * project and money data.
+         */
+        session_epoch: { type: Number, default: 0 },
+
         // ── Subscription (builders only) ────────────────────────────────────
         subscription_tier: {
             type: String,

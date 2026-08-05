@@ -29,7 +29,12 @@ for (const silo of ['/seller', '/builder', '/masonry']) {
 // and `/otp-verify` are the pre-merge pair — `/sign-up` minted a token without
 // ever checking an OTP, so it closes with the rest.
 router.use('/auth', retireAuthDoors({
-    except: ['/login', '/login/otp-verify', '/register'],
+    // `/firebase` and `/firebase/register` are unauthenticated by necessity —
+    // they are how a session is obtained — but they are not open doors: both
+    // demand a Firebase ID token signed by Google and take the phone number out
+    // of it, so neither can be called on behalf of a number the caller does not
+    // control. That is strictly more than `/register` ever asked for.
+    except: ['/login', '/login/otp-verify', '/register', '/firebase', '/firebase/register'],
 }));
 
 // Admin still signs in — the marketplace catalogue is published through it —
